@@ -1,0 +1,45 @@
+{
+  "baseUrl": "http://127.0.0.1:4478/",
+  "outDir": "docs/images",
+  "viewport": { "width": 1440, "height": 900, "scale": 2 },
+  "server": { "command": "node", "args": ["demo/server.js", "--port", "4478"], "cwd": "." },
+  "shots": [
+    {
+      "name": "overview.png",
+      "steps": [
+        { "type": "#query", "text": "sample input" },
+        { "click": "#submit" },
+        { "waitForText": "^Done", "selector": "#status" },
+        { "wait": 1200 }
+      ]
+    },
+    {
+      "name": "detail.png",
+      "element": "#detail",
+      "steps": [
+        { "click": "#submit" },
+        { "waitForText": "^Done", "selector": "#status" },
+        { "click": "#results .row" },
+        { "viewport": { "width": 1440, "height": 1250 } },
+        { "wait": 400 }
+      ]
+    }
+  ],
+  "gif": {
+    "name": "demo.gif",
+    "viewport": { "width": 1000, "height": 700, "scale": 1 },
+    "maxKB": 4096,
+    "steps": [
+      { "wait": 1200 },
+      { "type": "#query", "text": "sample input", "delay": 90 },
+      { "wait": 500 },
+      { "follow": "#results" },
+      { "click": "#submit" },
+      { "waitForText": "^Done", "selector": "#status" },
+      { "wait": 400 },
+      { "follow": false },
+      { "scroll": "#results", "to": "top" },
+      { "wait": 2500 }
+    ]
+  }
+}

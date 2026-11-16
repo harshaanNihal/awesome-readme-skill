@@ -1,0 +1,105 @@
+// Opens the preview page in dark and light, checks it, and saves screenshots.
+// Usage: README_TOOLS=<scratch folder> node shoot.mjs <readme-preview.html> <out-dir>
+// Saves per theme: first screen, 900 px slices of the whole page, each Mermaid diagram, each <details> opened.
+// Checks (printed, and written to report.json): Mermaid parse errors, broken images, tall images outside <details>,
+// links to #anchors that match no heading, code blocks and tables wider than the column, horizontal page scroll.
+// Exit code 1 when any check fails. Look at the screenshots too: the checks cannot see ugly.
+import fs from 'node:fs'
+import path from 'node:path'
+import { chromePath, need } from '../lib.mjs'
+
+const pp = need('puppeteer-core')
+const puppeteer = pp.launch ? pp : pp.default
+const [html, outDir] = process.argv.slice(2)
+if (!outDir) { console.error('usage: node shoot.mjs <readme-preview.html> <out-dir>'); process.exit(2) }
+fs.mkdirSync(outDir, { recursive: true })
+const cdn = /^https:\/\/(cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net)\//
+const browser = await puppeteer.launch({ executablePath: chromePath(), headless: true, args: ['--allow-file-access-from-files'] })
+const report = {}
+const problems = []
+
+for (const theme of ['dark', 'light']) {
+  const r = (report[theme] = { console: [], blocked: [], pageErrors: [] })
+  const page = await browser.newPage()
+  await page.setViewport({ width: 1280, height: 900 })
+  await page.setRequestInterception(true)
+  page.on('request', (req) => {
+    const u = req.url()
+    if (/^(file|data|about):/.test(u) || cdn.test(u)) req.continue()
+    else { r.blocked.push(u); req.abort() }
+  })
+  page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) r.console.push(m.type() + ': ' + m.text()) })
+  page.on('pageerror', (e) => r.pageErrors.push(String(e)))
+  await page.goto('file://' + path.resolve(html) + '?theme=' + theme, { waitUntil: 'load' })
+  await page.waitForFunction('window.__mermaidDone === true', { timeout: 30000 }).catch(() => problems.push(`${theme}: mermaid never finished`))
+  await page.waitForFunction(() => [...document.images].every((i) => i.complete), { timeout: 15000 }).catch(() => {})
+  await new Promise((s) => setTimeout(s, 800))
+
+  r.mermaidErrors = await page.evaluate(() => window.__mermaidErrors)
+  r.mermaid = await page.evaluate(() => [...document.querySelectorAll('pre.mermaid')].map((p) => ({
+    hasSvg: !!p.querySelector('svg'),
+    syntaxError: /Syntax error/i.test(p.textContent) || !!p.querySelector('.error-icon, .error-text'),
+    width: p.querySelector('svg') && Math.round(p.querySelector('svg').getBoundingClientRect().width),
+  })))
+  r.images = await page.evaluate(() => [...document.querySelectorAll('article img')].map((i) => ({
+    src: (i.getAttribute('src') || '').slice(0, 60),
+    natural: i.naturalWidth + 'x' + i.naturalHeight,
+    shown: Math.round(i.getBoundingClientRect().width) + 'x' + Math.round(i.getBoundingClientRect().height),
+    ok: i.complete && i.naturalWidth > 0,
+    tallOutsideDetails: i.getBoundingClientRect().height > 900 && !i.closest('details'),
+  })))
+  // GitHub's heading ids: lower case, drop punctuation, spaces to hyphens, repeats get -1, -2. The API render omits them, so compute.
+  r.anchors = await page.evaluate(() => {
+    const seen = {}
+    const ids = new Set([...document.querySelectorAll('article [id], article a[name]')].map((e) => e.id || e.getAttribute('name')))
+    for (const h of document.querySelectorAll('article h1, article h2, article h3, article h4, article h5, article h6')) {
+      const base = h.textContent.trim().toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s_-]/gu, '').replace(/\s/g, '-')
+      ids.add(seen[base] ? `${base}-${seen[base]}` : base)
+      seen[base] = (seen[base] ?? 0) + 1
+    }
+    return [...document.querySelectorAll('article a[href^="#"]')].map((a) => a.getAttribute('href').slice(1)).filter((id) => id && !ids.has(decodeURIComponent(id).toLowerCase()) && !ids.has(id))
+  })
+  r.overflow = await page.evaluate(() => ({
+    pre: [...document.querySelectorAll('pre:not(.mermaid)')].filter((p) => p.scrollWidth > p.clientWidth).map((p) => ({ scrollW: p.scrollWidth, clientW: p.clientWidth, start: p.textContent.slice(0, 40) })),
+    tables: [...document.querySelectorAll('table')].filter((t) => t.scrollWidth > t.clientWidth).map((t) => ({ scrollW: t.scrollWidth, clientW: t.clientWidth, head: t.querySelector('th')?.textContent })),
+    pageScroll: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  }))
+
+  if (r.mermaidErrors.length) problems.push(`${theme}: mermaid errors: ${r.mermaidErrors.join(' | ')}`)
+  r.mermaid.forEach((m, i) => (m.syntaxError || !m.hasSvg) && problems.push(`${theme}: diagram ${i + 1} did not render`))
+  r.images.filter((i) => !i.ok).forEach((i) => problems.push(`${theme}: image failed to load: ${i.src}`))
+  r.images.filter((i) => i.tallOutsideDetails).forEach((i) => problems.push(`${theme}: tall image outside <details>: ${i.src}`))
+  r.anchors.forEach((a) => problems.push(`${theme}: link to #${a} matches no heading`))
+  r.overflow.pre.forEach((p) => problems.push(`${theme}: code block wider than the column: ${p.start}`))
+  r.overflow.tables.forEach((t) => problems.push(`${theme}: table wider than the column: ${t.head}`))
+  if (r.overflow.pageScroll) problems.push(`${theme}: page scrolls sideways`)
+  if (r.blocked.length) problems.push(`${theme}: blocked ${r.blocked.length} request(s), first: ${r.blocked[0]}`)
+
+  const H = await page.evaluate(() => document.documentElement.scrollHeight)
+  r.height = H
+  await page.screenshot({ path: `${outDir}/${theme}-first.png`, clip: { x: 0, y: 0, width: 1280, height: 900 } })
+  let n = 0
+  for (let y = 0; y < H; y += 900) {
+    n++
+    await page.screenshot({ path: `${outDir}/${theme}-slice-${String(n).padStart(2, '0')}.png`, clip: { x: 0, y, width: 1280, height: Math.min(900, H - y) }, captureBeyondViewport: true })
+  }
+  r.slices = n
+  const ms = await page.$$('.mermaid-wrap')
+  for (let i = 0; i < ms.length; i++) await ms[i].screenshot({ path: `${outDir}/${theme}-mermaid-${i + 1}.png` })
+  const ds = await page.$$('details')
+  for (let i = 0; i < ds.length; i++) {
+    await ds[i].evaluate((d) => { d.open = true })
+    await new Promise((s) => setTimeout(s, 200))
+    await ds[i].screenshot({ path: `${outDir}/${theme}-details-${i + 1}.png` })
+  }
+  r.details = ds.length
+  await page.close()
+}
+await browser.close()
+report.problems = problems
+fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 1))
+const d = report.dark
+console.log(`dark: ${d.slices} slices, ${d.mermaid.length} diagram(s), ${d.images.length} image(s), ${d.details} <details>; light: ${report.light.slices} slices`)
+console.log(problems.length ? 'PROBLEMS:\n  ' + problems.join('\n  ') : 'No problems found by the automated checks. Now look at the screenshots.')
+console.log('screenshots and report.json in', outDir)
+process.exit(problems.length ? 1 : 0)
