@@ -5,28 +5,57 @@
 //   mkdir -p /tmp/readme-tools && cd /tmp/readme-tools && npm init -y && npm i puppeteer-core gifenc pngjs omggif
 //   export README_TOOLS=/tmp/readme-tools   # the folder that holds node_modules (see lib.mjs)
 //   export CHROME="/path/to/chrome"         # optional: common install paths are searched
-// Needs Node 22.2 or later (zlib.crc32). Run it from the repo root so relative paths in the config resolve there.
+// Needs Node 22.2 or later (zlib.crc32).
 //
 // USAGE
 //   node capture.mjs --config capture.json [name ...]
 //   node capture.mjs --base-url http://127.0.0.1:8080/ --out docs/images     # no config: one screenshot, hero.png
 // "name" picks a shot by file name without extension, or "gif". No names runs everything in the config.
 // FLAGS (override the config): --config FILE  --base-url URL  --out DIR  --width N  --height N  --scale N
-//   --server "cmd arg ..."   command that starts the demo instance (it is stopped after every shot)
+//   --server "cmd arg ..."   same as "server" in the config, run in the current directory
 //   --allow-remote           allow a base URL that is not loopback. Do not use this on a real service.
+//
+// PATHS
+//   Every relative file path resolves against the directory you run the tool from. Not against the config file, not against
+//   the repo root. That covers --config, outDir (or --out), server.cwd and framesDir. Relative paths in server.args resolve
+//   against server.cwd, because the command runs there. A config that ships inside a sub-project must be run from that
+//   folder. "path" in a shot or the gif is a URL path on baseUrl, not a file.
+//
+// OUTPUT
+//   Images are written to outDir, or to docs/images under the current directory when outDir is not set. The folder is
+//   created if it is missing. --out DIR replaces outDir for one run: use it to write somewhere else, for example a
+//   scratch folder, so a test run leaves nothing in the repo.
 //
 // CONFIG (JSON, see capture.example.json)
 //   baseUrl, outDir, viewport {width,height,scale}, waitUntil (default networkidle0), timeout (ms, default 30000),
+//   colorScheme "light" | "dark" (default "light"): sets prefers-color-scheme before the page loads, so the first paint is
+//     right and the output never depends on the machine's own setting. A shot or the gif can set its own. Any other value
+//     is an error. The app has to follow prefers-color-scheme: a page that is always dark stays dark.
 //   maxPngKB (default 600; bigger PNGs are re-encoded as 256-colour PNGs), allowOrigins [extra origins to allow],
-//   server {command, args, cwd}: started fresh for each shot and polled at baseUrl until it answers, so
-//     every shot starts from the same clean state.
-//   shots [{ name, path, viewport, steps, element (CSS selector to screenshot), fullPage }]
-//   gif   { name, path, viewport, steps, maxKB (default 4096), framesDir (keep the frames that went in, for checking) }
+//   server {command, args, cwd}: started before and stopped after every shot and the gif, and polled at baseUrl until it
+//     answers, so each one starts from the same clean state.
+//   shots [{ name, path, viewport, colorScheme, steps, element (CSS selector to screenshot), fullPage }]
+//   gif   { name, path, viewport, colorScheme, steps, maxKB (default 4096),
+//           framesDir (keep the frames that went in, for checking; the folder is deleted and recreated) }
 // STEPS (run in order; in the gif they run while frames are recorded)
 //   {"goto":"/path"} {"click":"css"} {"type":"css","text":"...","delay":90} {"press":"Enter"} {"wait":ms}
-//   {"waitFor":"css"} {"waitForText":"regex","selector":"css"} {"scroll":"css or empty","to":"bottom|top|<px>"}
-//   {"eval":"js expression run in the page"} {"viewport":{...}} {"media":"print"} {"follow":"css"|false}
+//   {"select":"css","value":"option value"} {"waitFor":"css"} {"waitForText":"regex","selector":"css"}
+//   {"scroll":"css or empty","to":"bottom|top|<px>"} {"eval":"js expression run in the page"} {"viewport":{...}}
+//   {"media":"print"} {"follow":"css"|false}
+//   "select" picks the option with that value in a <select> and fires its input and change events. An unknown value is an error.
+//   "media" switches between print and screen. It does not change colorScheme.
 //   "follow" keeps the newest content of that scrollable element in view while frames are recorded.
+//
+// TALL PAGES
+//   A shot is the viewport and nothing more: content below it is cut off. To keep all of it, set "fullPage": true (the whole
+//   scrollable page) or "element": "css" (one element, even if it is taller than the viewport). Neither shows content hidden
+//   inside a scrolling panel or a layout sized to the viewport (100vh). For those, give the shot a taller "viewport" instead.
+//   The gif is always one viewport, so size its viewport to fit.
+//
+// GIF STATE
+//   Recording starts right after the page loads, and the steps run while frames are recorded. State that a step sets
+//   (a colour scheme, a select, a filter) shows as the old state in the first frames. Set it before recording starts:
+//   use colorScheme for the colour scheme, and the URL in "path" for anything the app reads from the address.
 //
 // Safety: only the base URL's origin (plus allowOrigins) is reachable. Every other request the page makes is aborted
 // and counted. A non-loopback base URL is refused unless --allow-remote is given.
@@ -59,6 +88,10 @@ for (const k of ['width', 'height', 'scale']) if (flags[k]) cfg.viewport[k] = Nu
 if (flags.server) { const [command, ...args] = flags.server.split(/\s+/); cfg.server = { command, args } }
 if (!cfg.baseUrl) { console.error('A base URL is required: --base-url or "baseUrl" in the config.'); process.exit(2) }
 if (!cfg.shots && !cfg.gif) cfg.shots = [{ name: 'hero.png' }]
+// colorScheme is the config default, a shot or the gif can override it. Checked up front so a typo fails before anything starts.
+for (const [where, v] of [['the config', cfg.colorScheme], ...(cfg.shots ?? []).map((s) => [`shot ${s.name}`, s.colorScheme]), ['the gif', cfg.gif?.colorScheme]]) {
+  if (v !== undefined && v !== 'light' && v !== 'dark') { console.error(`Invalid colorScheme ${JSON.stringify(v)} in ${where}: use "light" or "dark".`); process.exit(2) }
+}
 
 const base = new URL(cfg.baseUrl)
 const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname)
@@ -95,6 +128,8 @@ async function session(item, fn) {
   })
   try {
     const page = await browser.newPage()
+    // before the first load, so the first paint already has the right scheme
+    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: item.colorScheme ?? cfg.colorScheme ?? 'light' }])
     const v = { ...cfg.viewport, ...item.viewport }
     await page.setViewport({ width: v.width, height: v.height, deviceScaleFactor: v.scale })
     page.setDefaultTimeout(TIMEOUT)
@@ -119,6 +154,7 @@ async function run(page, steps = [], ctx = {}) {
     if ('goto' in s) await page.goto(new URL(s.goto, base).href, { waitUntil: cfg.waitUntil ?? 'networkidle0' })
     else if ('click' in s) await page.click(s.click)
     else if ('type' in s) { await page.click(s.type); await page.type(s.type, s.text, { delay: s.delay ?? 0 }) }
+    else if ('select' in s) { if (!(await page.select(s.select, String(s.value))).length) throw new Error(`no option with value ${JSON.stringify(s.value)} in ${s.select}`) }
     else if ('press' in s) await page.keyboard.press(s.press)
     else if ('wait' in s) await sleep(s.wait)
     else if ('waitFor' in s) await page.waitForSelector(s.waitFor)
@@ -165,7 +201,7 @@ async function takeShot(shot) {
 
 // ---- GIF
 async function recordGif(g) {
-  await session({ viewport: { scale: 1, ...g.viewport }, path: g.path }, async (page) => {
+  await session({ viewport: { scale: 1, ...g.viewport }, path: g.path, colorScheme: g.colorScheme }, async (page) => {
     const frames = []
     const ctx = { follow: null }
     let on = true

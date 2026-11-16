@@ -1,6 +1,7 @@
 {
   "baseUrl": "http://127.0.0.1:4478/",
   "outDir": "docs/images",
+  "colorScheme": "light",
   "viewport": { "width": 1440, "height": 900, "scale": 2 },
   "server": { "command": "node", "args": ["demo/server.js", "--port", "4478"], "cwd": "." },
   "shots": [
@@ -8,6 +9,7 @@
       "name": "overview.png",
       "steps": [
         { "type": "#query", "text": "sample input" },
+        { "select": "#sort", "value": "newest" },
         { "click": "#submit" },
         { "waitForText": "^Done", "selector": "#status" },
         { "wait": 1200 }
@@ -15,6 +17,7 @@
     },
     {
       "name": "detail.png",
+      "colorScheme": "dark",
       "element": "#detail",
       "steps": [
         { "click": "#submit" },

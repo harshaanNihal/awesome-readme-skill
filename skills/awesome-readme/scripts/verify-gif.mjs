@@ -1,14 +1,21 @@
 // verify-gif.mjs: decodes a GIF and prints size, frame count, loop count and total play time. Optionally compares
 // every frame to the PNGs that went in (set "framesDir" in the capture config to keep them).
-// Usage: README_TOOLS=<scratch folder with node_modules> node verify-gif.mjs docs/images/demo.gif [framesDir]
+// Usage: README_TOOLS=<scratch folder with node_modules> node verify-gif.mjs docs/images/demo.gif [framesDir] [--frames <dir>]
+// --frames <dir> writes every frame of the GIF as <dir>/NNN-<delay>ms.png, to open them with an image reader. The folder
+// is created if missing and must be empty. It needs no framesDir in the capture config.
 import fs from 'node:fs'
 import path from 'node:path'
 import { need } from './lib.mjs'
 
 const omggif = need('omggif')
 const { PNG } = need('pngjs')
-const [file, framesDir] = process.argv.slice(2)
-if (!file) { console.error('usage: node verify-gif.mjs file.gif [framesDir]'); process.exit(2) }
+const args = process.argv.slice(2)
+const f = args.indexOf('--frames')
+const outDir = f >= 0 ? args.splice(f, 2)[1] : null
+const [file, framesDir] = args
+if (!file || (f >= 0 && !outDir)) { console.error('usage: node verify-gif.mjs file.gif [framesDir] [--frames <dir>]'); process.exit(2) }
+if (outDir && fs.existsSync(outDir) && fs.readdirSync(outDir).length) { console.error(`${outDir} is not empty: pick a new folder for --frames.`); process.exit(2) }
+if (outDir) fs.mkdirSync(outDir, { recursive: true })
 const bytes = fs.readFileSync(file)
 const gif = new omggif.GifReader(bytes)
 const { width, height } = gif
@@ -20,6 +27,7 @@ for (let i = 0; i < gif.numFrames(); i++) {
   const info = gif.frameInfo(i)
   total += info.delay * 10
   gif.decodeAndBlitFrameRGBA(i, canvas)
+  if (outDir) fs.writeFileSync(path.join(outDir, `${String(i).padStart(3, '0')}-${info.delay * 10}ms.png`), PNG.sync.write({ width, height, data: Buffer.from(canvas.buffer) }))
   if (refs[i] && (i % 9 === 0 || i === gif.numFrames() - 1)) {
     const ref = PNG.sync.read(fs.readFileSync(path.join(framesDir, refs[i]))).data
     let d = 0
@@ -28,4 +36,5 @@ for (let i = 0; i < gif.numFrames(); i++) {
   }
 }
 console.log(`total play time ${total} ms`)
+if (outDir) console.log(`wrote ${gif.numFrames()} frames to ${outDir}`)
 if (bytes.length > 4 * 1024 * 1024) console.warn('WARNING: over 4 MB')
