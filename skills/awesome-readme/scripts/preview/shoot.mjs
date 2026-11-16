@@ -12,9 +12,9 @@
 // Saves per theme (dark and light) in <out-dir>: <theme>-first.png (the first screen), <theme>-slice-NN.png (the whole page
 // in 900 px slices), <theme>-mermaid-N.png (each diagram) and <theme>-details-N.png (each <details> opened), plus report.json.
 // Open every PNG. A GIF shows as one arbitrary still frame here: judge a GIF when it is made (stage 2).
-// Checks (printed, and written to report.json): Mermaid parse errors, broken images, tall images (rendered more than 900 px
-// high at the width shown) outside <details>, links to #anchors that match no heading, code blocks and tables wider than the
-// column, horizontal page scroll. A code block that is too wide is reported with the number of characters that fit and, for
+// Checks (printed, and written to report.json): Mermaid parse errors and diagrams with no size (no screenshot), broken images,
+// tall images (rendered more than 900 px high at the width shown) outside <details>, links to #anchors that match no heading,
+// code blocks and tables wider than the column, horizontal page scroll. A code block that is too wide is reported with the number of characters that fit and, for
 // each line that does not, its line number in the block, its length and its first 60 characters.
 // Prints how many remote images (badges, hosted pictures) were swapped for local placeholders: those are NOT checked.
 // Exit code 1 when any check fails. Look at the screenshots too: the checks cannot see ugly.
@@ -39,6 +39,15 @@ const args = ['--allow-file-access-from-files', '--disable-background-networking
 const browser = await puppeteer.launch({ executablePath: chromePath(), headless: true, args })
 const report = {}
 const problems = []
+// Every per-element screenshot goes through here. An element with no size (a diagram that failed to render, a hidden <details>)
+// makes puppeteer throw ("Node has 0 height"), which would lose report.json. Record it as a problem instead and go on. A problem
+// already listed by the checks (the same "diagram N did not render") is not listed twice.
+async function shot(el, file, problem) {
+  try { await el.screenshot({ path: file }) } catch (e) {
+    if (!problems.includes(problem)) problems.push(problem)
+    console.error(`${problem}: ${e.message}`)
+  }
+}
 
 for (const theme of ['dark', 'light']) {
   const r = (report[theme] = { console: [], blocked: [], pageErrors: [], requests: {} })
@@ -127,12 +136,12 @@ for (const theme of ['dark', 'light']) {
   }
   r.slices = n
   const ms = await page.$$('.mermaid-wrap')
-  for (let i = 0; i < ms.length; i++) await ms[i].screenshot({ path: `${outDir}/${theme}-mermaid-${i + 1}.png` })
+  for (let i = 0; i < ms.length; i++) await shot(ms[i], `${outDir}/${theme}-mermaid-${i + 1}.png`, `${theme}: diagram ${i + 1} did not render`)
   const ds = await page.$$('details')
   for (let i = 0; i < ds.length; i++) {
     await ds[i].evaluate((d) => { d.open = true })
     await new Promise((s) => setTimeout(s, 200))
-    await ds[i].screenshot({ path: `${outDir}/${theme}-details-${i + 1}.png` })
+    await shot(ds[i], `${outDir}/${theme}-details-${i + 1}.png`, `${theme}: <details> ${i + 1} has no size, no screenshot`)
   }
   r.details = ds.length
   await page.close()
