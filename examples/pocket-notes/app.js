@@ -51,7 +51,7 @@ function render() {
   const shown = visible()
   list.replaceChildren(...shown.map(card))
   $('#empty').hidden = shown.length > 0
-  $('#empty-text').textContent = query.trim() ? `No notes match “${query.trim()}”.` : notes.length ? 'No notes with this tag.' : 'No notes yet. Add one with the form.'
+  $('#empty-text').textContent = !notes.length ? 'No notes yet. Add one with the form.' : query.trim() ? `No notes match “${query.trim()}”.` : 'No notes with this tag.'
   $('#clear-filters').hidden = !notes.length
   $('#count').textContent = `Showing ${shown.length} of ${notes.length} notes`
   for (const b of document.querySelectorAll('#tag-filters button')) b.setAttribute('aria-pressed', b.dataset.tag === tag)
