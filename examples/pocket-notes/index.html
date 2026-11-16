@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pocket Notes</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Pocket Notes</h1>
+    <p class="tagline">Small notes that live in this tab. Reload to start over.</p>
+  </header>
+  <main>
+    <section aria-labelledby="add-heading">
+      <h2 id="add-heading">Add a note</h2>
+      <form id="note-form">
+        <label for="note-title">Title</label>
+        <input id="note-title" required maxlength="80" autocomplete="off">
+        <label for="note-body">Note</label>
+        <textarea id="note-body" rows="4" maxlength="400"></textarea>
+        <label for="note-tag">Tag</label>
+        <select id="note-tag">
+          <option>work</option>
+          <option>home</option>
+          <option>ideas</option>
+          <option>reading</option>
+        </select>
+        <button id="add-note" type="submit">Add note</button>
+      </form>
+    </section>
+    <section aria-labelledby="notes-heading">
+      <h2 id="notes-heading">Notes</h2>
+      <div class="toolbar">
+        <div class="row">
+          <label for="search">Search</label>
+          <input id="search" type="search" placeholder="Title or text" autocomplete="off">
+        </div>
+        <div class="row" id="tag-filters" role="group" aria-label="Filter by tag">
+          <button type="button" data-tag="all" aria-pressed="true">All</button>
+          <button type="button" data-tag="work" aria-pressed="false">work</button>
+          <button type="button" data-tag="home" aria-pressed="false">home</button>
+          <button type="button" data-tag="ideas" aria-pressed="false">ideas</button>
+          <button type="button" data-tag="reading" aria-pressed="false">reading</button>
+        </div>
+      </div>
+      <p id="count" aria-live="polite"></p>
+      <ul id="note-list" tabindex="-1"></ul>
+      <div id="empty" hidden>
+        <p id="empty-text"></p>
+        <button id="clear-filters" type="button">Clear search and tag</button>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
