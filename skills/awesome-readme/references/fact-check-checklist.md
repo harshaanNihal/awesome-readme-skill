@@ -97,6 +97,7 @@ A plural subject with no keyword is also a universal: "Responses carry header X"
 
 ### 12. Images
 - Each image shows the current UI. Method: if the repository keeps a capture config, retake the images into a scratch folder with `--out` and compare them with the committed ones by eye, never overwriting those. A retake can differ in a few anti-aliased pixels, so compare what is on screen, not bytes. With no config, say that the images were not compared. Each alt text describes what the image shows.
+- Run the capture tool as it is, loopback-only. Then it starts Chrome with a host resolver rule that fails every host name except loopback, so the run reaches nothing but the demo instance, Chrome's own requests included. Do not add `--allow-remote` or `allowOrigins` for a check: with either, the rule is off and Chrome's own startup requests are possible.
 - No image shows real personal data, a real account, or a real token.
 - Captions match the image.
 

@@ -13,8 +13,11 @@
 // "name" picks a shot by file name without extension, or "gif". No names runs everything in the config. Leave ".png" off on
 // the command line. In the config a shot's "name" may be written either way: "hero" and "hero.png" both give hero.png.
 // FLAGS (override the config): --config FILE  --base-url URL  --out DIR  --width N  --height N  --scale N
+//   --width, --height and --scale set the default viewport of every shot and of the gif in that run. A "viewport" that a shot or
+//   the gif sets itself wins over them, key by key (the gif's scale is 1 unless it sets one, so --scale never reaches it).
 //   --server "cmd arg ..."   same as "server" in the config, run in the current directory
-//   --allow-remote           allow a base URL that is not loopback. Do not use this on a real service.
+//   --allow-remote           allow a base URL that is not loopback. Do not use this on a real service. It also switches off
+//                            the host resolver rule described under Safety.
 //
 // PATHS
 //   Every relative file path resolves against the directory you run the tool from. Not against the config file, not against
@@ -32,7 +35,8 @@
 //   colorScheme "light" | "dark" (default "light"): sets prefers-color-scheme before the page loads, so the first paint is
 //     right and the output never depends on the machine's own setting. A shot or the gif can set its own. Any other value
 //     is an error. The app has to follow prefers-color-scheme: a page that is always dark stays dark.
-//   maxPngKB (default 600; bigger PNGs are re-encoded as 256-colour PNGs), allowOrigins [extra origins to allow],
+//   maxPngKB (default 600; bigger PNGs are re-encoded as 256-colour PNGs),
+//   allowOrigins [extra origins to allow. Any entry switches off the host resolver rule, see Safety],
 //   server {command, args, cwd}: started before and stopped after every shot and the gif, and polled at baseUrl until it
 //     answers, so each one starts from the same clean state. If something already answers at baseUrl, the tool stops with an
 //     "already in use" error and does not start it. If the server exits while it is polled or while shots are taken, the tool
@@ -69,10 +73,16 @@
 //   file is over maxKB. verify-gif.mjs prints the size and the play time of the finished file. Quote that play time: GIF
 //   delays are stored in hundredths of a second, so it differs slightly from the "plays" figure printed here.
 //
-// Safety: only the base URL's origin (plus allowOrigins) is reachable. Every other request the page makes is aborted
-// and counted. A non-loopback base URL is refused unless --allow-remote is given. Chrome starts with
-// --disable-background-networking, but it can still make a few startup requests of its own, with no page open (see
-// preview/shoot.mjs). The tool cannot see or block them, and they carry nothing from the project.
+// Safety: only the base URL's origin (plus allowOrigins) is reachable from the page. Every other request the page makes is
+// aborted and counted ("blocked non-local requests" at the end). A non-loopback base URL is refused unless --allow-remote is
+// given. Chrome starts with --disable-background-networking and --disable-component-update. Chrome can still make requests of
+// its own with no page open (Chrome 157 does, see preview/shoot.mjs), and the interception cannot see them. So a loopback-only
+// run, one with no --allow-remote and no allowOrigins in the config, also starts Chrome with
+//   --host-resolver-rules="MAP * ~NOTFOUND , EXCLUDE 127.0.0.1 , EXCLUDE localhost , EXCLUDE ::1"
+// which makes every host name except loopback (127.0.0.1, localhost and [::1], the forms the base URL check accepts) fail to
+// resolve, so Chrome reaches nothing but the demo. Other IP addresses fail too, 127.0.0.2 among them. With --allow-remote, or
+// with any allowOrigins entry (even a loopback one), the rule is off because a remote host must resolve. Then Chrome's own
+// requests are possible. They carry nothing from the project.
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -116,6 +126,10 @@ if (!loopback && !flags.allowRemote) {
 const OUT = path.resolve(cfg.outDir || 'docs/images')
 const TIMEOUT = cfg.timeout ?? 30000
 const allowed = new Set([base.origin, ...(cfg.allowOrigins ?? [])])
+// A run that may reach only the demo (no --allow-remote, no allowOrigins) also keeps Chrome itself off the network: every host
+// name except loopback fails to resolve, Chrome's own startup requests included. IPv6 [::1] is written ::1 in the rule.
+const loopbackOnly = !flags.allowRemote && !(cfg.allowOrigins ?? []).length
+const LOOPBACK_ONLY_RULE = '--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1 , EXCLUDE localhost , EXCLUDE ::1'
 const blocked = []
 fs.mkdirSync(OUT, { recursive: true })
 
@@ -157,7 +171,7 @@ async function session(item, fn) {
   const server = await startServer()
   const browser = await puppeteer.launch({
     executablePath: chromePath(), headless: true,
-    args: ['--disable-background-networking', '--no-first-run', '--hide-scrollbars', '--force-color-profile=srgb'],
+    args: ['--disable-background-networking', '--disable-component-update', '--no-first-run', '--hide-scrollbars', '--force-color-profile=srgb', ...(loopbackOnly ? [LOOPBACK_ONLY_RULE] : [])],
   })
   try {
     const page = await browser.newPage()
