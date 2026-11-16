@@ -1,0 +1,14 @@
+{
+  "name": "awesome-readme-skill",
+  "owner": {
+    "name": "Harshaan Nihal Khan"
+  },
+  "description": "A plugin that adds the awesome-readme skill for writing README files that are checked against the code.",
+  "plugins": [
+    {
+      "name": "awesome-readme",
+      "source": "./",
+      "description": "Writes or rewrites a project README in six checked stages (research, demo images, draft, render check, fact-check, pull request); use it when a README is missing, weak or needs screenshots, a demo GIF, Mermaid diagrams or a layout tree."
+    }
+  ]
+}

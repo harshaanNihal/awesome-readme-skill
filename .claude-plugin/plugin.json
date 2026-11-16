@@ -1,0 +1,19 @@
+{
+  "name": "awesome-readme",
+  "version": "1.0.0",
+  "description": "Writes or rewrites a project README in six checked stages (research, demo images, draft, render check, fact-check, pull request); use it when a README is missing, weak or needs screenshots, a demo GIF, Mermaid diagrams or a layout tree.",
+  "author": {
+    "name": "Harshaan Nihal Khan",
+    "url": "https://github.com/harshaanNihal"
+  },
+  "homepage": "https://github.com/harshaanNihal/awesome-readme-skill",
+  "repository": "https://github.com/harshaanNihal/awesome-readme-skill",
+  "license": "MIT",
+  "keywords": [
+    "readme",
+    "documentation",
+    "screenshots",
+    "mermaid",
+    "fact-check"
+  ]
+}

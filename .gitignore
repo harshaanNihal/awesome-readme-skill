@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+
+# output of skills/awesome-readme/scripts/preview/render.sh
+readme-preview.html
+rendered.html
+body.json
+shots/
