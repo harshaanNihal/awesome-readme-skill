@@ -62,4 +62,115 @@ jobs:
           'git+https://github.com/agentskills/agentskills@83021e2be457a9b6679148719c1f6074f0ad975e#subdirectory=skills-ref'
           skills-ref validate skills/awesome-readme
 
-  # A later change adds the smoke-test job here, below "check".
+  # Proves on a clean machine that the capture tool and the offline render check run: it captures the example app,
+  # checks every image the config defines, and renders each README that exists. Nothing here uses the network except
+  # the npm install and Chrome's own startup; the tools write only under $RUNNER_TEMP.
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # The tools look for their packages in $README_TOOLS/node_modules, never in the repository.
+      - name: Install the helper packages
+        shell: bash
+        run: |
+          tools="$RUNNER_TEMP/readme-tools"
+          mkdir -p "$tools"
+          cd "$tools"
+          npm init -y > /dev/null
+          npm i --no-audit --no-fund puppeteer-core gifenc pngjs omggif marked@18.2.0 github-markdown-css@5.8.1 mermaid@11.4.1
+          echo "README_TOOLS=$tools" >> "$GITHUB_ENV"
+
+      # lib.mjs takes CHROME first, then searches fixed paths that include /usr/bin/google-chrome. CHROME is set anyway so a
+      # missing browser fails here with a clear message. Neither tool passes --no-sandbox to Chrome, and the Ubuntu 24.04
+      # runner blocks unprivileged user namespaces through AppArmor, which Chrome's sandbox needs. So lift that
+      # restriction (the setting does not exist on older images, where nothing is needed).
+      - name: Find Chrome and let its sandbox start
+        shell: bash
+        run: |
+          chrome=$(command -v google-chrome) || { echo "google-chrome not found on the runner" >&2; exit 1; }
+          "$chrome" --version
+          echo "CHROME=$chrome" >> "$GITHUB_ENV"
+          if sysctl -n kernel.apparmor_restrict_unprivileged_userns > /dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
+      - name: Capture the example app
+        shell: bash
+        working-directory: examples/pocket-notes
+        run: |
+          node "$GITHUB_WORKSPACE/skills/awesome-readme/scripts/capture.mjs" --config capture.json --out "$RUNNER_TEMP/images"
+          # Same file names capture.mjs writes: a shot name without an extension gets .png, the GIF defaults to demo.gif.
+          node - "$RUNNER_TEMP/images" <<'EOF'
+          const fs = require('node:fs')
+          const path = require('node:path')
+          const [dir] = process.argv.slice(2)
+          const cfg = JSON.parse(fs.readFileSync('capture.json', 'utf8'))
+          const want = [
+            ...(cfg.shots ?? []).map((s) => (path.extname(s.name) ? s.name : s.name + '.png')),
+            ...(cfg.gif ? [cfg.gif.name ?? 'demo.gif'] : []),
+          ]
+          if (!want.length) { console.error('capture.json defines no images'); process.exit(1) }
+          let bad = 0
+          for (const name of want) {
+            const size = fs.existsSync(path.join(dir, name)) ? fs.statSync(path.join(dir, name)).size : -1
+            console.log(size > 0 ? `ok      ${name} ${size} bytes` : `MISSING ${name}`)
+            if (size <= 0) bad++
+          }
+          if (bad) { console.error(`${bad} of ${want.length} images missing or empty`); process.exit(1) }
+          EOF
+
+      - name: Verify the GIF
+        shell: bash
+        working-directory: examples/pocket-notes
+        run: |
+          gif=$(node -p "const c = require('./capture.json'); c.gif ? (c.gif.name ?? 'demo.gif') : ''")
+          [ -n "$gif" ] || { echo "capture.json defines no gif" >&2; exit 1; }
+          node "$GITHUB_WORKSPACE/skills/awesome-readme/scripts/verify-gif.mjs" "$RUNNER_TEMP/images/$gif"
+
+      # Each README is rendered with the repository folder it documents as the root. A README that is not written yet is skipped.
+      - name: Render the READMEs offline
+        shell: bash
+        run: |
+          rc=0
+          for entry in root:README.md pocket-notes:examples/pocket-notes/README.md; do
+            name=${entry%%:*}
+            file=${entry#*:}
+            if [ ! -f "$file" ]; then
+              echo "skip $file: no such file yet"
+              continue
+            fi
+            echo "render --offline $file"
+            bash skills/awesome-readme/scripts/preview/render.sh --offline "$file" "$(dirname "$file")" "$RUNNER_TEMP/preview-$name" || {
+              echo "render check failed for $file" >&2
+              rc=1
+            }
+          done
+          exit "$rc"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: smoke-output
+          path: |
+            ${{ runner.temp }}/images
+            ${{ runner.temp }}/preview-*/shots
+          retention-days: 3
+
+      # --ignored also lists files that .gitignore hides, so a tool that wrote into an ignored folder is caught too.
+      - name: Check the tools left the repository untouched
+        shell: bash
+        run: |
+          status=$(git status --porcelain --ignored)
+          if [ -n "$status" ]; then
+            echo "The run left changes in the repository:" >&2
+            echo "$status" >&2
+            exit 1
+          fi
