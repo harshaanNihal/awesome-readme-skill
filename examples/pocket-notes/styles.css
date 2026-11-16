@@ -1,4 +1,4 @@
-/* Follows the system theme. data-theme="light" or "dark" on <html> forces one (app.js sets it from ?theme=). */
+/* Follows the system colour scheme (prefers-color-scheme) through light-dark(). */
 :root {
   color-scheme: light dark;
   --bg: light-dark(#f6f5f1, #15171c);
@@ -11,8 +11,6 @@
   --tint: light-dark(#e3f1ec, #223a33);
   --danger: light-dark(#a02b2b, #f08a8a);
 }
-:root[data-theme='light'] { color-scheme: light }
-:root[data-theme='dark'] { color-scheme: dark }
 
 * { box-sizing: border-box }
 body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif }

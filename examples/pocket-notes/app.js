@@ -14,10 +14,6 @@ let nextId = 9
 let query = ''
 let tag = 'all'
 
-// ?theme=light or ?theme=dark overrides the system colour scheme, so a capture does not depend on the host's setting
-const forced = new URLSearchParams(location.search).get('theme')
-if (forced === 'light' || forced === 'dark') document.documentElement.dataset.theme = forced
-
 const $ = (selector) => document.querySelector(selector)
 const list = $('#note-list')
 const search = $('#search')
