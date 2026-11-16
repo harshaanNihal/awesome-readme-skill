@@ -1,5 +1,8 @@
 // Opens the preview page in dark and light, checks it, and saves screenshots.
-// Usage: README_TOOLS=<scratch folder> node shoot.mjs <readme-preview.html> <out-dir>
+// Usage: README_TOOLS=<scratch folder> node shoot.mjs [--offline] <readme-preview.html> <out-dir>
+// --offline: Chrome gets no network at all. Only file:, data: and about: requests run. Any other request is aborted, recorded
+// and fails the run with the full list (the CDN allowance of the default mode is off). The render is an approximation of
+// GitHub's (see offline.mjs); the default mode is the accurate one.
 // Saves per theme: first screen, 900 px slices of the whole page, each Mermaid diagram, each <details> opened.
 // Checks (printed, and written to report.json): Mermaid parse errors, broken images, tall images outside <details>,
 // links to #anchors that match no heading, code blocks and tables wider than the column, horizontal page scroll.
@@ -10,22 +13,27 @@ import { chromePath, need } from '../lib.mjs'
 
 const pp = need('puppeteer-core')
 const puppeteer = pp.launch ? pp : pp.default
-const [html, outDir] = process.argv.slice(2)
-if (!outDir) { console.error('usage: node shoot.mjs <readme-preview.html> <out-dir>'); process.exit(2) }
+const offline = process.argv.includes('--offline')
+const [html, outDir] = process.argv.slice(2).filter((a) => a !== '--offline')
+if (!outDir) { console.error('usage: node shoot.mjs [--offline] <readme-preview.html> <out-dir>'); process.exit(2) }
 fs.mkdirSync(outDir, { recursive: true })
 const cdn = /^https:\/\/(cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net)\//
-const browser = await puppeteer.launch({ executablePath: chromePath(), headless: true, args: ['--allow-file-access-from-files'] })
+// Offline also makes every host name fail to resolve and stops Chrome's own background requests, as a second wall behind the interception.
+const args = ['--allow-file-access-from-files', ...(offline ? ['--host-resolver-rules=MAP * ~NOTFOUND', '--disable-background-networking'] : [])]
+const browser = await puppeteer.launch({ executablePath: chromePath(), headless: true, args })
 const report = {}
 const problems = []
 
 for (const theme of ['dark', 'light']) {
-  const r = (report[theme] = { console: [], blocked: [], pageErrors: [] })
+  const r = (report[theme] = { console: [], blocked: [], pageErrors: [], ...(offline && { requests: {} }) })
   const page = await browser.newPage()
   await page.setViewport({ width: 1280, height: 900 })
   await page.setRequestInterception(true)
   page.on('request', (req) => {
     const u = req.url()
-    if (/^(file|data|about):/.test(u) || cdn.test(u)) req.continue()
+    const scheme = u.split(':')[0]
+    if (offline) r.requests[scheme] = (r.requests[scheme] ?? 0) + 1 // request log: count per scheme
+    if (/^(file|data|about):/.test(u) || (!offline && cdn.test(u))) req.continue()
     else { r.blocked.push(u); req.abort() }
   })
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) r.console.push(m.type() + ': ' + m.text()) })
@@ -59,6 +67,7 @@ for (const theme of ['dark', 'light']) {
     }
     return [...document.querySelectorAll('article a[href^="#"]')].map((a) => a.getAttribute('href').slice(1)).filter((id) => id && !ids.has(decodeURIComponent(id).toLowerCase()) && !ids.has(id))
   })
+  if (offline) r.placeholders = await page.evaluate(() => document.querySelectorAll('img[data-badge]').length)
   r.overflow = await page.evaluate(() => ({
     pre: [...document.querySelectorAll('pre:not(.mermaid)')].filter((p) => p.scrollWidth > p.clientWidth).map((p) => ({ scrollW: p.scrollWidth, clientW: p.clientWidth, start: p.textContent.slice(0, 40) })),
     tables: [...document.querySelectorAll('table')].filter((t) => t.scrollWidth > t.clientWidth).map((t) => ({ scrollW: t.scrollWidth, clientW: t.clientWidth, head: t.querySelector('th')?.textContent })),
@@ -73,7 +82,7 @@ for (const theme of ['dark', 'light']) {
   r.overflow.pre.forEach((p) => problems.push(`${theme}: code block wider than the column: ${p.start}`))
   r.overflow.tables.forEach((t) => problems.push(`${theme}: table wider than the column: ${t.head}`))
   if (r.overflow.pageScroll) problems.push(`${theme}: page scrolls sideways`)
-  if (r.blocked.length) problems.push(`${theme}: blocked ${r.blocked.length} request(s), first: ${r.blocked[0]}`)
+  if (r.blocked.length) problems.push(offline ? `${theme}: network request(s) attempted, all aborted: ${[...new Set(r.blocked)].join(' ')}` : `${theme}: blocked ${r.blocked.length} request(s), first: ${r.blocked[0]}`)
 
   const H = await page.evaluate(() => document.documentElement.scrollHeight)
   r.height = H
@@ -100,6 +109,10 @@ report.problems = problems
 fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 1))
 const d = report.dark
 console.log(`dark: ${d.slices} slices, ${d.mermaid.length} diagram(s), ${d.images.length} image(s), ${d.details} <details>; light: ${report.light.slices} slices`)
+if (offline) {
+  console.log(`offline: ${d.placeholders} remote image(s) replaced by local placeholders and NOT checked; requests by scheme: ${JSON.stringify(d.requests)}; ${d.blocked.length + report.light.blocked.length} network request(s) attempted`)
+  console.log('offline render is an approximation of GitHub. Run without --offline for the accurate check when you can.')
+}
 console.log(problems.length ? 'PROBLEMS:\n  ' + problems.join('\n  ') : 'No problems found by the automated checks. Now look at the screenshots.')
 console.log('screenshots and report.json in', outDir)
 process.exit(problems.length ? 1 : 0)

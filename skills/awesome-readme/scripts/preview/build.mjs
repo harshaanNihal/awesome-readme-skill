@@ -1,14 +1,20 @@
 // Wraps GitHub's rendered README HTML in a page that looks like github.com: github-markdown-css plus Mermaid.
-// Usage: node build.mjs <rendered.html> <readme-dir> <repo-root> <out.html>
+// Usage: node build.mjs [--offline] <rendered.html> <readme-dir> <repo-root> <out.html>
+// --offline: the first argument is the README.md itself. It is rendered locally by offline.mjs (an approximation of GitHub's
+// renderer, see there), and the stylesheet and Mermaid are read from README_TOOLS/node_modules instead of the CDNs.
 // Relative images and links resolve against the README's folder (a base tag). A leading slash resolves against the repo root.
 // Badge images are served from a proxy that this check does not contact, so they are swapped for local placeholders.
 // The placeholder only shows layout. Verify the real badge URLs separately (they must return 200).
+// Offline, every remote image gets a placeholder, because none can load.
 import fs from 'node:fs'
 import path from 'node:path'
 
-const [src, readmeDir, root, out] = process.argv.slice(2)
-if (!out) { console.error('usage: node build.mjs <rendered.html> <readme-dir> <repo-root> <out.html>'); process.exit(2) }
+const offline = process.argv.includes('--offline')
+const [src, readmeDir, root, out] = process.argv.slice(2).filter((a) => a !== '--offline')
+if (!out) { console.error('usage: node build.mjs [--offline] <rendered.html> <readme-dir> <repo-root> <out.html>'); process.exit(2) }
+const off = offline ? await import('./offline.mjs') : null // exits 2 with the npm i line if a package is missing
 let html = fs.readFileSync(src, 'utf8')
+if (off) html = off.toHtml(html).replace(/<source\b[^>]*\bsrcset="https?:[^"]*"[^>]*>/gi, '')
 
 html = html.replace(/(src|href)="\/(?!\/)([^"]*)"/g, (m, attr, p) => `${attr}="file://${root}/${p}"`)
 
@@ -30,7 +36,8 @@ function badge(alt, canonical) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${lw + mw}" height="20"><rect width="${lw + mw}" height="20" rx="3" fill="#555"/><rect x="${lw}" width="${mw}" height="20" rx="3" fill="${color}"/>${label ? t(0, lw, label) : ''}${t(lw, mw, message || alt)}</svg>`
   return `<img alt="${alt}" data-badge="placeholder" src="data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}">`
 }
-html = html.replace(/<img\b[^>]*src="https:\/\/camo[^"]*"[^>]*>/g, (tag) => badge(tag.match(/alt="([^"]*)"/)?.[1] ?? '', tag.match(/data-canonical-src="([^"]*)"/)?.[1]))
+const remote = off ? /<img\b[^>]*src="https?:\/\/[^"]*"[^>]*>/gi : /<img\b[^>]*src="https:\/\/camo[^"]*"[^>]*>/g
+html = html.replace(remote, (tag) => badge(tag.match(/alt="([^"]*)"/)?.[1] ?? '', tag.match(/data-canonical-src="([^"]*)"/)?.[1] ?? (off && tag.match(/src="([^"]*)"/)[1])))
 
 const page = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -51,7 +58,7 @@ const page = `<!doctype html>
   document.documentElement.className = theme
   document.documentElement.setAttribute('data-color-mode', theme)
   const l = document.createElement('link'); l.rel = 'stylesheet'
-  l.href = 'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-' + theme + '.min.css'
+  l.href = '${off ? off.cssBase : 'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.8.1/github-markdown-'}' + theme + '${off ? '.css' : '.min.css'}'
   document.head.appendChild(l)
   window.__theme = theme
 </script>
@@ -60,7 +67,7 @@ const page = `<!doctype html>
 ${html}
 </article></div>
 <!-- jsdelivr, not cdnjs: the cdnjs Mermaid build was blocked by the browser (ORB) in this local page. -->
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+<script src="${off ? off.mermaidSrc : 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js'}"></script>
 <script>
   window.__mermaidErrors = []
   ;(async () => {
