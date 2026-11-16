@@ -14,7 +14,8 @@
 // Open every PNG. A GIF shows as one arbitrary still frame here: judge a GIF when it is made (stage 2).
 // Checks (printed, and written to report.json): Mermaid parse errors, broken images, tall images (rendered more than 900 px
 // high at the width shown) outside <details>, links to #anchors that match no heading, code blocks and tables wider than the
-// column, horizontal page scroll.
+// column, horizontal page scroll. A code block that is too wide is reported with the number of characters that fit and, for
+// each line that does not, its line number in the block, its length and its first 60 characters.
 // Prints how many remote images (badges, hosted pictures) were swapped for local placeholders: those are NOT checked.
 // Exit code 1 when any check fails. Look at the screenshots too: the checks cannot see ugly.
 import fs from 'node:fs'
@@ -88,7 +89,20 @@ for (const theme of ['dark', 'light']) {
   })
   r.placeholders = await page.evaluate(() => document.querySelectorAll('img[data-badge]').length)
   r.overflow = await page.evaluate(() => ({
-    pre: [...document.querySelectorAll('pre:not(.mermaid)')].filter((p) => p.scrollWidth > p.clientWidth).map((p) => ({ scrollW: p.scrollWidth, clientW: p.clientWidth, start: p.textContent.slice(0, 40) })),
+    pre: [...document.querySelectorAll('pre:not(.mermaid)')].filter((p) => p.scrollWidth > p.clientWidth).map((p) => {
+      // How many characters fit: measure 100 characters in the block's own font, then divide the width inside the padding.
+      const probe = document.createElement('span')
+      probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre'
+      probe.textContent = '0'.repeat(100)
+      ;(p.querySelector('code') ?? p).appendChild(probe)
+      const charW = probe.getBoundingClientRect().width / 100
+      probe.remove()
+      const s = getComputedStyle(p)
+      const cols = Math.floor((p.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight)) / charW)
+      const all = p.textContent.replace(/\n$/, '').split('\n').map((t, i) => ({ n: i + 1, len: t.length, text: t.slice(0, 60) }))
+      const wide = all.filter((l) => l.len > cols)
+      return { scrollW: p.scrollWidth, clientW: p.clientWidth, cols, lines: wide.length ? wide : [all.reduce((a, b) => (b.len > a.len ? b : a))] }
+    }),
     tables: [...document.querySelectorAll('table')].filter((t) => t.scrollWidth > t.clientWidth).map((t) => ({ scrollW: t.scrollWidth, clientW: t.clientWidth, head: t.querySelector('th')?.textContent })),
     pageScroll: document.documentElement.scrollWidth > document.documentElement.clientWidth,
   }))
@@ -98,7 +112,7 @@ for (const theme of ['dark', 'light']) {
   r.images.filter((i) => !i.ok).forEach((i) => problems.push(`${theme}: image failed to load: ${i.src}`))
   r.images.filter((i) => i.tallOutsideDetails).forEach((i) => problems.push(`${theme}: tall image outside <details>: ${i.src}`))
   r.anchors.forEach((a) => problems.push(`${theme}: link to #${a} matches no heading`))
-  r.overflow.pre.forEach((p) => problems.push(`${theme}: code block wider than the column: ${p.start}`))
+  r.overflow.pre.forEach((p) => problems.push(`${theme}: code block wider than the column (${p.cols} characters fit on a line). Shorten these lines, or split a shell line with a trailing backslash:\n    ` + p.lines.map((l) => `line ${l.n} of the block has ${l.len} characters: ${l.text}`).join('\n    ')))
   r.overflow.tables.forEach((t) => problems.push(`${theme}: table wider than the column: ${t.head}`))
   if (r.overflow.pageScroll) problems.push(`${theme}: page scrolls sideways`)
   if (r.blocked.length) problems.push(offline ? `${theme}: network request(s) attempted, all aborted: ${[...new Set(r.blocked)].join(' ')}` : `${theme}: blocked ${r.blocked.length} request(s), first: ${r.blocked[0]}`)
