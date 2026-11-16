@@ -4,7 +4,7 @@
 # Usage: README_TOOLS=<scratch folder with puppeteer-core in node_modules> render.sh [--offline] <README.md> <repo-root> <out-dir>
 #   <repo-root> is the top folder of the repository. It only matters for a link or image that starts with "/", which GitHub
 #   resolves against the repository root. A relative path resolves against the README's own folder whatever you pass here
-#   (tested with a README in a sub-folder), so a README in a sub-folder needs no special argument.
+#   (tested with a README in a sub-folder). So pass the repository's top folder for every README, also one in a sub-folder.
 #   <out-dir>: use a new folder for each run. A second run into the same folder overwrites the first and can leave some of
 #   its screenshots behind.
 # Needs: gh (logged in), node, Chrome (CHROME env var if not in a common place). --offline needs no gh.

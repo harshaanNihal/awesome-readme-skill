@@ -157,7 +157,7 @@ README_TOOLS=<scratch> <skill>/scripts/preview/render.sh <README.md> <repo-root>
 README_TOOLS=<scratch> <skill>/scripts/preview/render.sh --offline <README.md> <repo-root> <scratch>/preview-offline
 ```
 
-`<repo-root>` is the repository's top folder. It matters only for a link or image that starts with `/`, which GitHub resolves against the repository root. Relative paths resolve against the README's own folder, so a README in a sub-folder needs no special argument. Use a new output folder for each run, for example when you compare the modes: a second run into the same folder overwrites the first.
+`<repo-root>` is the repository's top folder, also for a README in a sub-folder. It matters only for a link or image that starts with `/`, which GitHub resolves against the repository root. Relative paths resolve against the README's own folder. Use a new output folder for each run, for example when you compare the modes: a second run into the same folder overwrites the first.
 
 The first line is the default mode, the closest preview of GitHub. The second is `--offline`, which can go anywhere among the arguments. Both save dark and light screenshots to `<out>/shots/`. Both exit 1 and list problems when they find Mermaid parse errors, broken images, code blocks wider than the column, anchors that match no heading and no explicit `<a name>` or `id=` target, or tall images outside `<details>`. A tall image renders more than 900 px high at the width shown.
 
