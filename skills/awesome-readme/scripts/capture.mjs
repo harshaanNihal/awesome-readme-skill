@@ -33,7 +33,9 @@
 //     is an error. The app has to follow prefers-color-scheme: a page that is always dark stays dark.
 //   maxPngKB (default 600; bigger PNGs are re-encoded as 256-colour PNGs), allowOrigins [extra origins to allow],
 //   server {command, args, cwd}: started before and stopped after every shot and the gif, and polled at baseUrl until it
-//     answers, so each one starts from the same clean state.
+//     answers, so each one starts from the same clean state. If something already answers at baseUrl, the tool stops with an
+//     "already in use" error and does not start it. If the server exits while it is polled or while shots are taken, the tool
+//     stops with its exit code and last output. Without "server" (you run the demo yourself) neither check applies.
 //   shots [{ name, path, viewport, colorScheme, steps, element (CSS selector to screenshot), fullPage }]
 //   gif   { name, path, viewport, colorScheme, steps, maxKB (default 4096),
 //           framesDir (keep the frames that went in, for checking; the folder is deleted and recreated) }
@@ -106,22 +108,41 @@ const blocked = []
 fs.mkdirSync(OUT, { recursive: true })
 
 // ---- demo instance and browser session
+const answers = () => fetch(base.href, { signal: AbortSignal.timeout(2000) }).then(() => true, () => false)
+
+// Returns { stop, guard }. guard(work) rejects if the server exits before work settles.
 async function startServer() {
-  if (!cfg.server) return async () => {}
+  if (!cfg.server) return { stop: async () => {}, guard: (work) => work }
+  // Another process on this address would answer the poll below while our own server dies with "address in use".
+  if (await answers()) throw new Error(`${base.href} is already in use by another process. Stop that process or change the port (baseUrl and server).`)
   const { command, args = [], cwd = '.' } = cfg.server
-  const child = spawn(command, args, { cwd: path.resolve(cwd), stdio: ['ignore', 'ignore', 'inherit'] })
-  let exited = null
-  child.on('exit', (c) => (exited = c))
-  for (let i = 0; i < 100; i++) {
-    if (exited !== null) throw new Error(`demo server exited with code ${exited}`)
-    try { await fetch(base.href); break } catch { await sleep(200) }
-    if (i === 99) { child.kill(); throw new Error(`demo server did not answer at ${base.href}`) }
+  const child = spawn(command, args, { cwd: path.resolve(cwd), stdio: ['ignore', 'pipe', 'pipe'] })
+  let tail = ''
+  const keep = (b) => { tail = (tail + b).slice(-2000) }
+  child.stdout.on('data', keep)
+  child.stderr.on('data', (b) => { keep(b); process.stderr.write(b) })
+  let dead = null
+  const closed = new Promise((res) => child.on('close', res))
+  const died = new Promise((res) => child.on('exit', (c, sig) => { dead = c === null ? `was killed by ${sig}` : `exited with code ${c}`; res() }))
+  const gone = async () => {
+    await Promise.race([closed, sleep(300)]) // let the last output arrive
+    const last = tail.trim().split('\n').slice(-10).join('\n  ')
+    return new Error(`demo server ${dead}${last ? `. Last output:\n  ${last}` : ''}`)
   }
-  return () => new Promise((res) => { if (exited !== null) return res(); child.once('exit', res); child.kill('SIGTERM') })
+  for (let i = 0, up = false; !up; i++) {
+    if (dead) throw await gone()
+    if (i === 100) { child.kill(); throw new Error(`demo server did not answer at ${base.href}`) }
+    if (!(up = await answers())) await sleep(200)
+  }
+  if (dead) throw await gone() // never accept an answer after the child has died
+  return {
+    stop: () => new Promise((res) => { if (dead) return res(); child.once('exit', res); child.kill('SIGTERM') }),
+    guard: (work) => Promise.race([work, died.then(async () => { throw await gone() })]),
+  }
 }
 
 async function session(item, fn) {
-  const stop = await startServer()
+  const server = await startServer()
   const browser = await puppeteer.launch({
     executablePath: chromePath(), headless: true,
     args: ['--disable-background-networking', '--no-first-run', '--hide-scrollbars', '--force-color-profile=srgb'],
@@ -140,11 +161,10 @@ async function session(item, fn) {
       else { blocked.push(u); r.abort() }
     })
     page.on('pageerror', (e) => console.error('pageerror:', e.message))
-    await page.goto(new URL(item.path ?? '/', base).href, { waitUntil: cfg.waitUntil ?? 'networkidle0' })
-    await fn(page)
+    await server.guard(page.goto(new URL(item.path ?? '/', base).href, { waitUntil: cfg.waitUntil ?? 'networkidle0' }).then(() => fn(page)))
   } finally {
     await browser.close()
-    await stop()
+    await server.stop()
   }
 }
 
@@ -212,6 +232,7 @@ async function recordGif(g) {
         frames.push({ t, png: await page.screenshot({ type: 'png' }) })
       }
     })()
+    loop.catch(() => {}) // the browser may be closed under this loop (the server died): that must not hide the real error
     try { await run(page, g.steps, ctx) } finally { on = false; await loop }
     encodeGif(frames, path.join(OUT, g.name ?? 'demo.gif'), g)
   })
