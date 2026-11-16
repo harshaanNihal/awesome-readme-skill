@@ -8,7 +8,7 @@
     {
       "name": "awesome-readme",
       "source": "./",
-      "description": "Writes or rewrites a project README in six checked stages (research, demo images, draft, render check, fact-check, pull request); use it when a README is missing, weak or needs screenshots, a demo GIF, Mermaid diagrams or a layout tree."
+      "description": "Writes or rewrites a project README in six checked stages (research, demo images, draft, render check, fact-check, pull request), and can also check an existing README against the code or refresh it after the code changed; use it when a README is missing, weak, out of date or needs screenshots, a demo GIF, Mermaid diagrams or a layout tree."
     }
   ]
 }

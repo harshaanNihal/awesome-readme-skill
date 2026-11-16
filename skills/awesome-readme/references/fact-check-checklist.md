@@ -1,10 +1,12 @@
 # Fact-check checklist
 
-Use this in stage 5. The checker must be a different agent from the writer, or, with no sub-agents, a separate pass done after the draft with the draft's assumptions set aside. Place the README at its final path in the repo first, so relative links and paths resolve.
+Use this in stage 5, and in `--check` mode (audit only, see the end of this file). The checker must be a different agent from the writer, or, with no sub-agents, a separate pass done after the draft with the draft's assumptions set aside. Place the README at its final path in the repo first, so relative links and paths resolve.
 
 The rule: every sentence is a claim until you have checked it against the finished code. Earlier runs needed many corrections in drafts the writer believed were accurate, and old READMEs held overstated claims that only showed up when each sentence was checked one by one. Expect the same.
 
 Fix the README, never the code. If checking exposes a code problem (a feature that is documented in the code's own help text but not wired, a dead option, a leak), do not fix it. Put it in the report.
+
+In `--check` mode do not edit the README either. Where this file says to fix, write the corrected wording in the report.
 
 ## How to check
 
@@ -73,7 +75,7 @@ Check hard any sentence with: all, every, always, never, only, none, no (as in "
 - URL routes and API paths named in the text match the router.
 
 ### 9. Links and anchors
-- Every `#anchor` matches a heading, by GitHub's rule: lower case, punctuation dropped, spaces to hyphens, repeated headings numbered. The preview script (`scripts/preview/`) lists dead anchors.
+- Every `#anchor` matches a heading (or an explicit `<a name>` or `id=` target), by GitHub's rule: lower case, punctuation dropped, spaces to hyphens, repeated headings numbered. The preview script (`scripts/preview/`) lists dead anchors.
 - Every relative link and image path points to a file that exists.
 - Every external link is a real URL for the thing it names. Check with a HEAD request only for documentation hosts, and never contact the thing the README documents if it is a real service.
 - Credits and licenses: each named project, its license and its link are right, and match what the project's own license file says. If you cannot confirm a license, say so in the report.
@@ -105,3 +107,17 @@ Then:
 - **Total corrected, removed, confirmed.** The number corrected is a useful signal of how much the draft overreached.
 - **Code problems found** (not fixed): one line each, with file and what is wrong.
 - **Claims I could not confirm**: the writer's list, each now resolved (confirmed, corrected, removed) or still open with the reason.
+
+## Report format in `--check` mode
+
+The README stays as it is. Mark each claim confirmed, wrong or could not confirm. Return:
+
+| README line | README said | Code says (file, line) | Corrected wording |
+|---|---|---|---|
+| 42 | "starts on port A" | default port is B (`src/server.js`, line 12) | "starts on port B" |
+
+Then:
+- **Totals:** checked, wrong, unconfirmed.
+- **Could not confirm:** each statement, with what you tried and why it stayed open.
+- **Layout problems** from the render check, unfixed.
+- **Code problems noticed** (not fixed, not README errors): one line each, with file and what is wrong.
