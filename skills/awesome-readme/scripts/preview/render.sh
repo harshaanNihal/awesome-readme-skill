@@ -2,6 +2,11 @@
 # GitHub-accurate README preview: GitHub's own renderer (gh api markdown, mode "markdown"), github-markdown-css, Mermaid, and
 # screenshots in dark and light.
 # Usage: README_TOOLS=<scratch folder with puppeteer-core in node_modules> render.sh [--offline] <README.md> <repo-root> <out-dir>
+#   <repo-root> is the top folder of the repository. It only matters for a link or image that starts with "/", which GitHub
+#   resolves against the repository root. A relative path resolves against the README's own folder whatever you pass here
+#   (tested with a README in a sub-folder), so a README in a sub-folder needs no special argument.
+#   <out-dir>: use a new folder for each run. A second run into the same folder overwrites the first and can leave some of
+#   its screenshots behind.
 # Needs: gh (logged in), node, Chrome (CHROME env var if not in a common place). --offline needs no gh.
 # Network use in a default-mode run: `gh api markdown` sends the README text to GitHub's Markdown API. Chrome downloads the
 #   stylesheet from cdnjs.cloudflare.com and Mermaid from cdn.jsdelivr.net. Those two requests carry no README text, and the
@@ -33,7 +38,7 @@
 set -euo pipefail
 : "${README_TOOLS:?set README_TOOLS to the scratch folder that holds node_modules}"
 export README_TOOLS
-usage() { echo "usage: render.sh [--offline] <README.md> <repo-root> <out-dir>   (--offline: no gh, no network; an approximation of GitHub)" >&2; exit 2; }
+usage() { echo "usage: render.sh [--offline] <README.md> <repo-root> <out-dir>   (--offline: no gh, no network; an approximation of GitHub; <repo-root>: top folder of the repository, used only for links that start with /)" >&2; exit 2; }
 offline=""
 args=()
 for a in "$@"; do

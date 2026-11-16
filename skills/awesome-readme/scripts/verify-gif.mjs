@@ -1,5 +1,8 @@
 // verify-gif.mjs: decodes a GIF and prints size, frame count, loop count and total play time. Optionally compares
 // every frame to the PNGs that went in (set "framesDir" in the capture config to keep them).
+// The "total play time" it prints is the figure to quote for a README: it adds up the delays stored in the file (hundredths of
+// a second). capture.mjs prints its own figure from millisecond timers, which differs slightly. Neither tool checks the
+// advice of 6 to 10 seconds and at most about 1200 px wide: compare the printed play time and size with it.
 // Usage: README_TOOLS=<scratch folder with node_modules> node verify-gif.mjs docs/images/demo.gif [framesDir] [--frames <dir>]
 // --frames <dir> writes every frame of the GIF as <dir>/NNN-<delay>ms.png, to open them with an image reader. The folder
 // is created if missing and must be empty. It needs no framesDir in the capture config.

@@ -2,7 +2,7 @@
 
 A snapshot of what a sample of well-known READMEs do, with snippets you can copy. Use it as the default research for stage 1. Refresh it (download the READMEs again, see the end of this file) only when the user asks, when the project is a different kind of thing from the sampled ones, or when you suspect the examples are out of date. Examples name the README they came from. Treat the "used by" column as a snapshot: READMEs change.
 
-Contents: A. Techniques, B. Section order of three well-structured READMEs, C. What not to do, D. Refreshing this research.
+Contents: A. Techniques, B. Section order of three well-structured READMEs, C. What not to do, D. Refreshing this research, E. A skill or plugin README.
 
 ## A. Techniques
 
@@ -19,7 +19,7 @@ Contents: A. Techniques, B. Section order of three well-structured READMEs, C. W
 | 9 | GitHub callouts | uptime-kuma (2 WARNING), bat, nuclei, fzf (heavy use) | Flags the few things that bite | block 9 |
 | 10 | Mermaid diagram | none of the sample; the awesome-readme list cites one | Diagram stays editable as text and renders on GitHub | block 10 |
 | 11 | Directory tree | none of the sample; the awesome-readme list cites four | Shows where to change things | block 11 |
-| 12 | Table of contents | fzf (generated), nuclei; gum has a command index | Needed past about 300 lines | block 12 |
+| 12 | Table of contents | fzf (generated), nuclei; gum has a command index | Needed past about 300 lines. A collapsed list in `<details>` counts | block 12 |
 | 13 | Comparison with similar tools | ripgrep (benchmark tables, why and why not), bat (links an alternatives doc) | Answers "why this and not X" before install | block 13 |
 | 14 | Footer: license and credits | nuclei, uv, gum | Closes with legal text and attribution | block 14 |
 
@@ -65,7 +65,7 @@ flowchart LR
 ```
 ````
 
-Block 11: directory tree. One entry per line, short comment after it. A line longer than about 100 characters overflows the code block on GitHub.
+Block 11: directory tree. One entry per line, short comment after it. A line longer than about 95 characters overflows the code block on GitHub (the column holds about 97).
 ````md
 ```text
 src/
@@ -108,7 +108,7 @@ MIT. See [LICENSE](LICENSE).
 
 1. **Sponsor copy above the install steps.** One sampled README opened with a long sponsor block of ads and promo codes before its first install command. Move sponsors below the license or into their own file.
 2. **Badge overload and vanity counters.** One sampled README had a wall of badges in several rows, including a page-view counter. Another had eleven, two of them bundle size. Use three to five badges in one row, each one a reader acts on. No counts that go stale, nothing that names the repo owner.
-3. **Every package manager expanded by default.** One installation section ran about 215 lines and listed about 25 package managers as open code blocks. Put the default command first and collapse the long tail.
+3. **Every package manager expanded by default.** One installation section ran about 215 lines and listed about 25 package managers as open code blocks. Put the default command first and collapse the long tail. A skill or plugin with many install routes uses the matrix in section E instead.
 4. **A giant inline table with malformed links.** One sampled README listed all of its modules in one very long inline table with no collapse, and some rows nested a markdown link inside a link destination, which does not resolve. Move big tables to their own file or a `<details>` block, and check link syntax.
 5. **The pitch buried under chrome.** One README put its one-sentence pitch after a cover image, a language row and three badge images, with `<br><br>` spacers on top. Pitch first, then one badge row.
 6. **Emoji lead-ins and marketing adjectives as a substitute for facts.** "Blazing fast" tells the reader nothing. A number, a command or an output does.
@@ -130,3 +130,37 @@ Stage 1 downloads a fixed list so results stay comparable. Raw URL: `https://raw
 | projectdiscovery/nuclei | collapsed flag dump, footer |
 
 If one returns 404, skip it and say so. Save the files in a scratch folder, never in the repo. For each README record: the technique, which README uses it, a copyable snippet, and anything that should not be copied. Keep the list of problems with line references so the finding can be checked.
+
+## E. A skill or plugin README
+
+A skill or plugin has no screen of its own, several install routes, and an effect that happens inside someone else's agent session. Three blocks cover what the sample READMEs do not. Install sections for skills can be seen in the READMEs of `anthropics/skills`, `vercel-labs/agent-skills` and `obra/superpowers`. The hero, quick start and layout follow `readme-skeleton.md`, including its "A project with no screen" notes.
+
+**1. Install matrix.** One row per route. Show the default route's command in the quick start, then the matrix, collapsed in `<details>` when it has more than about four rows. The Tested column is honest: write "yes" only for a route you ran and logged (the command, the date or version, and the result), and keep the log where the fact-checker can open it. A route you only read about says "documented, not run". Run the routes you can, in a throwaway location, before the draft, and hand the logs to the writer.
+
+````md
+| Route | Command | Tested |
+|---|---|---|
+| {{Default route}} | `{{command}}` | Yes: run on {{date}}, {{where the log is}} |
+| {{Second route}} | `{{command}}` | Documented, not run |
+````
+
+**2. Install steps for an agent.** Many people paste a README into their agent and say "install this". Put a short numbered block addressed to that agent: one action per step, and a check that proves the step worked.
+
+````md
+### Install steps for an agent
+
+1. Check that {{prerequisite}}.
+2. Run `{{command}}`. Do not change the destination folder.
+3. Confirm: {{a command or file that proves it installed, and what it should print}}.
+4. Tell the user what you added and where.
+````
+
+**3. What the tool sends where.** A table with one row per step that makes a network request, including package installs and a push, and one row saying "nothing" for the steps that make none. Check each row against the code.
+
+````md
+| Step | What leaves the machine | To where | How to avoid it |
+|---|---|---|---|
+| {{Step}} | {{exactly what is sent}} | {{host}} | {{flag or setting}} |
+````
+
+Do not write that it "works with" an agent you did not run. Name only the agents in the matrix, with their Tested value.

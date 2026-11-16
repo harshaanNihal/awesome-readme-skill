@@ -12,7 +12,8 @@
 // as a bare <section> without the "Footnotes" heading.
 // --offline: the first argument is the README.md itself. It is rendered locally by offline.mjs (an approximation of GitHub's
 // renderer, see there), and the stylesheet and Mermaid are read from README_TOOLS/node_modules instead of the CDNs.
-// Relative images and links resolve against the README's folder (a base tag). A leading slash resolves against the repo root.
+// Relative images and links resolve against the README's folder (a base tag), whatever <repo-root> is. A leading slash
+// resolves against <repo-root>, as GitHub resolves it against the repository root.
 // Badge images are served from a proxy that this check does not contact, so they are swapped for local placeholders.
 // The placeholder only shows layout. Verify the real badge URLs separately (they must return 200).
 // Offline, every remote image gets a placeholder, because none can load.

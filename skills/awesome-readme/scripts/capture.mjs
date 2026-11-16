@@ -10,7 +10,8 @@
 // USAGE
 //   node capture.mjs --config capture.json [name ...]
 //   node capture.mjs --base-url http://127.0.0.1:8080/ --out docs/images     # no config: one screenshot, hero.png
-// "name" picks a shot by file name without extension, or "gif". No names runs everything in the config.
+// "name" picks a shot by file name without extension, or "gif". No names runs everything in the config. Leave ".png" off on
+// the command line. In the config a shot's "name" may be written either way: "hero" and "hero.png" both give hero.png.
 // FLAGS (override the config): --config FILE  --base-url URL  --out DIR  --width N  --height N  --scale N
 //   --server "cmd arg ..."   same as "server" in the config, run in the current directory
 //   --allow-remote           allow a base URL that is not loopback. Do not use this on a real service.
@@ -47,11 +48,15 @@
 //   "select" picks the option with that value in a <select> and fires its input and change events. An unknown value is an error.
 //   "media" switches between print and screen. It does not change colorScheme.
 //   "follow" keeps the newest content of that scrollable element in view while frames are recorded.
+//   A {"wait": 1000} as the first step of the gif holds the opening frame: the page does not change while it waits, so the
+//   identical frames merge into one long first frame.
 //
 // TALL PAGES
 //   A shot is the viewport and nothing more: content below it is cut off. To keep all of it, set "fullPage": true (the whole
-//   scrollable page) or "element": "css" (one element, even if it is taller than the viewport). Neither shows content hidden
-//   inside a scrolling panel or a layout sized to the viewport (100vh). For those, give the shot a taller "viewport" instead.
+//   scrollable page) or "element": "css" (one element, even if it is taller than the viewport). "element": "body" takes the
+//   whole page and stops where the content ends. fullPage is never shorter than the viewport, so under a short page it adds
+//   blank space. Neither shows content hidden inside a scrolling panel or a layout sized to the viewport (100vh). For those,
+//   give the shot a taller "viewport" instead.
 //   The gif is always one viewport, so size its viewport to fit.
 //
 // GIF STATE
@@ -59,8 +64,15 @@
 //   (a colour scheme, a select, a filter) shows as the old state in the first frames. Set it before recording starts:
 //   use colorScheme for the colour scheme, and the URL in "path" for anything the app reads from the address.
 //
+// GIF LENGTH AND WIDTH
+//   The tool checks neither (the skill's advice is 6 to 10 seconds and at most about 1200 px wide), and it warns only when the
+//   file is over maxKB. verify-gif.mjs prints the size and the play time of the finished file. Quote that play time: GIF
+//   delays are stored in hundredths of a second, so it differs slightly from the "plays" figure printed here.
+//
 // Safety: only the base URL's origin (plus allowOrigins) is reachable. Every other request the page makes is aborted
-// and counted. A non-loopback base URL is refused unless --allow-remote is given.
+// and counted. A non-loopback base URL is refused unless --allow-remote is given. Chrome starts with
+// --disable-background-networking, but it can still make a few startup requests of its own, with no page open (see
+// preview/shoot.mjs). The tool cannot see or block them, and they carry nothing from the project.
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
