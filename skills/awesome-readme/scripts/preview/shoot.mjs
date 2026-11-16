@@ -56,11 +56,14 @@ for (const theme of ['dark', 'light']) {
     ok: i.complete && i.naturalWidth > 0,
     tallOutsideDetails: i.getBoundingClientRect().height > 900 && !i.closest('details'),
   })))
-  // GitHub's heading ids: lower case, drop punctuation, spaces to hyphens, repeats get -1, -2. The API render omits them, so compute.
+  // Link targets. The API's markdown mode returns GitHub's own ids (headings as user-content-<slug> with repeats -1, -2, and
+  // explicit <a name> / id= with the same prefix), and a #slug link reaches them, so strip the prefix. The offline render has
+  // no ids on its headings, so compute them: lower case, drop punctuation, spaces to hyphens, repeats get -1, -2.
   r.anchors = await page.evaluate(() => {
     const seen = {}
-    const ids = new Set([...document.querySelectorAll('article [id], article a[name]')].map((e) => e.id || e.getAttribute('name')))
+    const ids = new Set([...document.querySelectorAll('article [id], article a[name]')].flatMap((e) => { const i = e.id || e.getAttribute('name') || ''; return [i, i.replace(/^user-content-/, '')] }))
     for (const h of document.querySelectorAll('article h1, article h2, article h3, article h4, article h5, article h6')) {
+      if (h.nextElementSibling?.classList.contains('anchor')) continue // GitHub's id for this heading is in the set already
       const base = h.textContent.trim().toLowerCase().replace(/[^\p{L}\p{M}\p{N}\s_-]/gu, '').replace(/\s/g, '-')
       ids.add(seen[base] ? `${base}-${seen[base]}` : base)
       seen[base] = (seen[base] ?? 0) + 1

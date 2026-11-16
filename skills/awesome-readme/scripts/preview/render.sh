@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GitHub-accurate README preview: GitHub's own renderer (gh api markdown), github-markdown-css, Mermaid, and
+# GitHub-accurate README preview: GitHub's own renderer (gh api markdown, mode "markdown"), github-markdown-css, Mermaid, and
 # screenshots in dark and light.
 # Usage: README_TOOLS=<scratch folder with puppeteer-core in node_modules> render.sh [--offline] <README.md> <repo-root> <out-dir>
 # Needs: gh (logged in), node, Chrome (CHROME env var if not in a common place).
@@ -7,16 +7,24 @@
 # Output: <out-dir>/readme-preview.html and <out-dir>/shots/{dark,light}-*.png plus shots/report.json.
 # Exit code 1 means the check found problems (Mermaid errors, broken images, dead anchors, overflow). Read shots/report.json.
 #
+# Render mode: the README is posted with "mode": "markdown", the mode github.com uses for a README.md file. "gfm" is the mode for
+#   comments: it turns every newline inside a paragraph into <br>, so a hard-wrapped README previewed with line breaks that
+#   GitHub does not show (a hard-wrapped README gave 82 <br> in "gfm" and 0 in GitHub's own HTML). No "context" field: it
+#   changes nothing in "markdown" mode. Compared with GitHub's own HTML for three public READMEs, "markdown" mode gave the
+#   same line flow and the same heading ids. It returns task lists and > [!NOTE] callouts as plain text, so build.mjs rebuilds
+#   those two. What still differs from github.com is listed at the top of build.mjs.
+#
 # --offline: for a README that must not leave the machine. No `gh`, no CDN, no network at all: Chrome gets every request that
 #   is not a local file or data: URL aborted, and any such request fails the run with the list. The Markdown is rendered with
 #   `marked`, the stylesheet comes from github-markdown-css and Mermaid from the mermaid package, all read from
 #   $README_TOOLS/node_modules. If one is missing the script prints the `npm i ...` line to run in $README_TOOLS.
 #   Remote images (badges, hosted screenshots) cannot load, so they become local placeholders and are NOT checked (the run
 #   prints how many). Everything else is still checked.
-#   --offline is an APPROXIMATION of GitHub's renderer. It can differ from github.com in: syntax highlighting (none), emoji
-#   shortcodes, @mentions and #issue links, footnotes, math, callout icons, relative-link rewriting, heading id prefixes,
-#   autolink and HTML-nesting edge cases, and the HTML sanitizer (it drops <script>, <style> and the like, style="..." and
-#   on*= attributes, and nothing more). The default mode stays the accurate one: run it before you deliver when you can.
+#   --offline is an APPROXIMATION of GitHub's renderer. Paragraphs flow as in "markdown" mode. It can differ from github.com in:
+#   syntax highlighting (none), emoji shortcodes, @mentions and #issue links, footnotes, math, relative-link rewriting, heading
+#   ids and permalinks, autolink and HTML-nesting edge cases, and the HTML sanitizer (it drops <script>, <style> and the like,
+#   style="..." and on*= attributes, and nothing more). The default mode stays the accurate one: run it before you deliver
+#   when you can.
 set -euo pipefail
 : "${README_TOOLS:?set README_TOOLS to the scratch folder that holds node_modules}"
 export README_TOOLS
@@ -39,7 +47,7 @@ out=$(cd "${args[2]}" && pwd)
 
 src=$readme
 if [ -z "$offline" ]; then
-  node -e 'const fs=require("fs");fs.writeFileSync(process.argv[2],JSON.stringify({text:fs.readFileSync(process.argv[1],"utf8"),mode:"gfm"}))' "$readme" "$out/body.json"
+  node -e 'const fs=require("fs");fs.writeFileSync(process.argv[2],JSON.stringify({text:fs.readFileSync(process.argv[1],"utf8"),mode:"markdown"}))' "$readme" "$out/body.json"
   gh api markdown --input "$out/body.json" > "$out/rendered.html"
   src=$out/rendered.html
 fi

@@ -1,10 +1,13 @@
 // Offline Markdown to HTML for `render.sh --offline`, used by build.mjs. Importing this file checks that the packages are
 // installed in $README_TOOLS/node_modules and, if not, prints the `npm i ...` line to run there and exits 2.
 // It is an APPROXIMATION of GitHub's renderer: `marked` plus a few regexes that reshape its output like GitHub's HTML.
+// Paragraphs flow, as in the "markdown" mode GitHub uses for a README file (breaks: false, spelled out below because "gfm"
+// mode, the comment renderer, would turn every newline into <br>). Callouts are rebuilt by build.mjs, as in the default mode.
 // It can differ from github.com in: syntax highlighting (none), emoji shortcodes, @mentions and #issue links, footnotes,
-// math, callout icons, relative-link rewriting, heading id prefixes (shoot.mjs computes the ids GitHub would give),
-// autolink and HTML-nesting edge cases, and the sanitizer (only <script>, <style>, iframe-like tags, style="..." and on*=
-// attributes are dropped). The default mode (gh api markdown) is the accurate one.
+// math, relative-link rewriting, heading ids and permalinks (marked adds none; shoot.mjs computes the ids GitHub would give,
+// but not the trailing "-" GitHub adds when a heading ends in an inline comment or a badge), autolink and HTML-nesting
+// edge cases, and the sanitizer (only <script>, <style>, iframe-like tags, style="..." and on*= attributes are dropped).
+// The default mode (gh api markdown) is the accurate one.
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
@@ -28,14 +31,10 @@ const { marked } = await import(pathToFileURL(createRequire(path.join(tools, 'no
 export const cssBase = `file://${nm}/github-markdown-css/github-markdown-` // + theme + '.css'
 export const mermaidSrc = `file://${nm}/mermaid/dist/mermaid.min.js`
 
-const kind = { note: 'Note', tip: 'Tip', important: 'Important', warning: 'Warning', caution: 'Caution' }
-
 export function toHtml(text) {
-  return marked.parse(text, { gfm: true })
+  return marked.parse(text, { gfm: true, breaks: false })
     // Code blocks wrapped the way GitHub does, so build.mjs finds Mermaid blocks by .highlight-source-mermaid.
     .replace(/<pre><code(?: class="language-([^\s"]+)")?>([\s\S]*?)<\/code><\/pre>/g, (m, lang, code) => `<div class="highlight${lang ? ' highlight-source-' + lang : ''}"><pre>${code}</pre></div>`)
-    // Callouts. ponytail: ends at the first </blockquote>, so a quote nested inside a callout breaks it.
-    .replace(/<blockquote>\s*<p>\[!(note|tip|important|warning|caution)\]\s*([\s\S]*?)<\/blockquote>/gi, (m, k, body) => `<div class="markdown-alert markdown-alert-${k.toLowerCase()}" dir="auto"><p class="markdown-alert-title">${kind[k.toLowerCase()]}</p><p>${body.replace(/^<\/p>\s*<p>/, '')}</div>`)
     // Task lists, with the classes github-markdown-css styles.
     .replace(/<li><input ([^>]*type="checkbox"[^>]*)>/g, '<li class="task-list-item"><input class="task-list-item-checkbox" $1>')
     .replace(/<ul>(\s*<li class="task-list-item">)/g, '<ul class="contains-task-list">$1')
