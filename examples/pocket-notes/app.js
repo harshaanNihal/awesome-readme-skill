@@ -42,7 +42,7 @@ function card(n) {
     el('h3', { textContent: n.title }),
     el('p', { textContent: n.body }),
     el('p', { className: 'meta' }, el('span', { className: 'tag', textContent: n.tag }), el('time', { dateTime: n.created, textContent: day(n.created) }), n.pinned ? el('span', { className: 'badge', textContent: 'Pinned' }) : ''),
-    el('div', { className: 'actions' }, button('pin', 'Pin', n.pinned), button('done', 'Done', n.done), button('delete', 'Delete')),
+    el('div', { className: 'actions' }, button('pin', 'Pin', Boolean(n.pinned)), button('done', 'Done', Boolean(n.done)), button('delete', 'Delete')),
   )
   return li
 }
