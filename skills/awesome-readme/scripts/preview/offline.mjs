@@ -6,7 +6,9 @@
 // It can differ from github.com in: syntax highlighting (none), emoji shortcodes, @mentions and #issue links, footnotes,
 // math, relative-link rewriting, heading ids and permalinks (marked adds none; shoot.mjs computes the ids GitHub would give,
 // but not the trailing "-" GitHub adds when a heading ends in an inline comment or a badge), autolink and HTML-nesting
-// edge cases, and the sanitizer (only <script>, <style>, iframe-like tags, style="..." and on*= attributes are dropped).
+// edge cases, and the sanitizer. It removes <script>, <style>, <iframe>, <object>, <embed> and <form> elements that have a
+// closing tag (with what is inside them), the <link>, <meta> and <base> tags, and style="..." and on*= attributes, and nothing
+// more. An opening tag of one of those elements with no closing tag is left alone.
 // The default mode (gh api markdown) is the accurate one.
 import fs from 'node:fs'
 import path from 'node:path'

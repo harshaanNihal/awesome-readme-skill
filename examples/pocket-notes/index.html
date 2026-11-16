@@ -17,7 +17,7 @@
       <h2 id="add-heading">Add a note</h2>
       <form id="note-form">
         <label for="note-title">Title</label>
-        <input id="note-title" required maxlength="80" autocomplete="off">
+        <input id="note-title" required pattern=".*\S.*" title="Enter at least one character that is not a space." maxlength="80" autocomplete="off">
         <label for="note-body">Note</label>
         <textarea id="note-body" rows="4" maxlength="400"></textarea>
         <label for="note-tag">Tag</label>

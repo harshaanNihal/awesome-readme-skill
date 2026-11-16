@@ -2,8 +2,18 @@
 # GitHub-accurate README preview: GitHub's own renderer (gh api markdown, mode "markdown"), github-markdown-css, Mermaid, and
 # screenshots in dark and light.
 # Usage: README_TOOLS=<scratch folder with puppeteer-core in node_modules> render.sh [--offline] <README.md> <repo-root> <out-dir>
-# Needs: gh (logged in), node, Chrome (CHROME env var if not in a common place).
-# Network use is limited to `gh api markdown` and two CDNs (jsdelivr for Mermaid, cdnjs for the CSS). Nothing else.
+#   <repo-root> is the top folder of the repository. It only matters for a link or image that starts with "/", which GitHub
+#   resolves against the repository root. A relative path resolves against the README's own folder whatever you pass here
+#   (tested with a README in a sub-folder). So pass the repository's top folder for every README, also one in a sub-folder.
+#   <out-dir>: use a new folder for each run. A second run into the same folder overwrites the first and can leave some of
+#   its screenshots behind.
+# Needs: gh (logged in), node, Chrome (CHROME env var if not in a common place). --offline needs no gh.
+# Network use in a default-mode run: `gh api markdown` sends the README text to GitHub's Markdown API. Chrome downloads the
+#   stylesheet from cdnjs.cloudflare.com and Mermaid from cdn.jsdelivr.net. Those two requests carry no README text, and the
+#   page may load nothing else: any other request is blocked and fails the run. Chrome's background networking and component
+#   updates are switched off, but Chrome can still make a few startup requests of its own (see shoot.mjs). They are the same
+#   with no README open, and only --offline stops them. Not part of the run: the helper packages come from the npm registry
+#   when you install them, and stage 6 of the skill pushes to the project's remote. --offline lets nothing leave the machine.
 # Output: <out-dir>/readme-preview.html and <out-dir>/shots/{dark,light}-*.png plus shots/report.json.
 # Exit code 1 means the check found problems (Mermaid errors, broken images, dead anchors, overflow). Read shots/report.json.
 #
@@ -18,17 +28,18 @@
 #   is not a local file or data: URL aborted, and any such request fails the run with the list. The Markdown is rendered with
 #   `marked`, the stylesheet comes from github-markdown-css and Mermaid from the mermaid package, all read from
 #   $README_TOOLS/node_modules. If one is missing the script prints the `npm i ...` line to run in $README_TOOLS.
-#   Remote images (badges, hosted screenshots) cannot load, so they become local placeholders and are NOT checked (the run
-#   prints how many). Everything else is still checked.
+#   Remote images (badges, hosted screenshots) cannot load, so they become local placeholders and are NOT checked. The default
+#   mode swaps them for placeholders too, and both modes print how many. Everything else is still checked.
 #   --offline is an APPROXIMATION of GitHub's renderer. Paragraphs flow as in "markdown" mode. It can differ from github.com in:
 #   syntax highlighting (none), emoji shortcodes, @mentions and #issue links, footnotes, math, relative-link rewriting, heading
-#   ids and permalinks, autolink and HTML-nesting edge cases, and the HTML sanitizer (it drops <script>, <style> and the like,
-#   style="..." and on*= attributes, and nothing more). The default mode stays the accurate one: run it before you deliver
-#   when you can.
+#   ids and permalinks, autolink and HTML-nesting edge cases, and the HTML sanitizer (it removes <script>, <style>, <iframe>,
+#   <object>, <embed> and <form> elements that have a closing tag, with what is inside them, the <link>, <meta> and <base> tags,
+#   and style="..." and on*= attributes, and nothing more; an opening tag with no closing tag is left alone). The default mode
+#   stays the accurate one: run it before you deliver when you can.
 set -euo pipefail
 : "${README_TOOLS:?set README_TOOLS to the scratch folder that holds node_modules}"
 export README_TOOLS
-usage() { echo "usage: render.sh [--offline] <README.md> <repo-root> <out-dir>   (--offline: no gh, no network; an approximation of GitHub)" >&2; exit 2; }
+usage() { echo "usage: render.sh [--offline] <README.md> <repo-root> <out-dir>   (--offline: no gh, no network; an approximation of GitHub; <repo-root>: top folder of the repository, used only for links that start with /)" >&2; exit 2; }
 offline=""
 args=()
 for a in "$@"; do

@@ -1,6 +1,6 @@
 # README skeleton
 
-A fill-in shape with the markup that rendered correctly on GitHub. Replace every `{{PLACEHOLDER}}`. Delete a section when the project has nothing true to put in it. Do not leave placeholders behind, and do not keep a section just because the skeleton has it.
+A fill-in shape with the markup that rendered correctly on GitHub. Replace every `{{PLACEHOLDER}}`. Delete a section when the project has nothing true to put in it. Do not leave placeholders behind, and do not keep a section just because the skeleton has it. The last three sections of this file cover small projects, a project in a sub-folder of a larger repository, and a project with no screen.
 
 The order is: hero, demo, who it is for, quick start, how it works, screenshots, reference, layout, development, credits, license. Depth goes late and collapsed. The first screen has to answer "what is this" and "should I keep reading".
 
@@ -12,6 +12,8 @@ The order is: hero, demo, who it is for, quick start, how it works, screenshots,
 <h1 align="center">{{NAME}}</h1>
 
 <p align="center">{{ONE-LINE TAGLINE: what it does, for whom, in plain words}}</p>
+
+<p align="center"><sub>{{OPTIONAL, ONE LINE about this README itself, for example "This README is sample output of a tool." Delete the whole paragraph when there is no such notice.}}</sub></p>
 
 <p align="center">
   <img alt="{{BADGE 1 meaning}}" src="https://img.shields.io/badge/{{LABEL}}-{{MESSAGE}}-{{HEX}}"> <img alt="{{BADGE 2 meaning}}" src="https://img.shields.io/badge/{{LABEL}}-{{MESSAGE}}-{{HEX}}">
@@ -84,12 +86,12 @@ stateDiagram-v2
 ## Screenshots
 
 <p align="center">
-  <img src="docs/images/{{SHOT-1}}.png" width="860" alt="{{ALT: what is on screen and what it demonstrates}}"><br>
+  <img src="docs/images/{{SHOT-1}}.png" width="820" alt="{{ALT: what is on screen and what it demonstrates}}"><br>
   <sub>{{CAPTION}}</sub>
 </p>
 
 <p align="center">
-  <img src="docs/images/{{SHOT-2}}.png" width="860" alt="{{ALT}}"><br>
+  <img src="docs/images/{{SHOT-2}}.png" width="820" alt="{{ALT}}"><br>
   <sub>{{CAPTION}}</sub>
 </p>
 
@@ -184,6 +186,13 @@ To read the code, start with these files in order:
 
 {{Short paragraph: how to add the most common kind of extension, naming the files to touch.}}
 
+<details>
+<summary>Retake the screenshots and the GIF</summary>
+
+{{How: the capture config, the command, the folder it writes to, and what must be free, such as a port. Delete this block when the images were not made from a kept config.}}
+
+</details>
+
 ## Credits
 
 - **{{Category}}:** [{{project}}]({{url}}) ({{license}}).
@@ -200,11 +209,55 @@ What GitHub does with this markup. Check it with `scripts/preview/render.sh`.
 - **Attributes that survive:** `align`, `width`, `height`, `alt`, `src`, `href`. **`style` is stripped**, so do not rely on it for centering, colors or sizes. Use `align` and `width`.
 - **Centering:** wrap in `<p align="center">` or `<div align="center">`. A markdown heading inside a centered block needs the HTML form `<h1 align="center">`.
 - **Blank lines inside `<details>`:** leave one after `<summary>...</summary>` and one before `</details>`, or markdown inside will not render.
-- **Images in a row:** two `<img>` with `align="top"` and widths that add up to less than the column (the column is roughly 830 px wide on a desktop browser, so wider images are scaled down). A tall screenshot goes inside `<details>` with a `width`.
+- **Images in a row:** two `<img>` with `align="top"` and widths that add up to less than the column. The column is roughly 830 px wide on a desktop browser, so give a full-width screenshot `width="820"` or less. A wider image is scaled down to the column. A tall screenshot (over 900 px high at the width shown) goes inside `<details>` with a `width`.
 - **Image weight:** keep each PNG under about 600 KB (a 256-colour PNG is fine for flat UI) and the GIF under 4 MB.
-- **Badge URLs:** `https://img.shields.io/badge/<label>-<message>-<hex color>`. A hyphen in text is `--`, an underscore is `__`, a space is `%20` or `_`. Prefer static badges that state facts that do not change.
+- **Badge URLs:** `https://img.shields.io/badge/<label>-<message>-<hex color>`. A hyphen in text is `--`, an underscore is `__`, a space is `%20` or `_`, and a percent sign is `%25`. A plus sign can stay as it is (`%2B` also works): `node-22+-1b6b5a` shows "node: 22+". Prefer static badges that state facts that do not change. The preview shows a placeholder for every badge, so stage 5 checks the real URL.
 - **Callouts:** `> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`. Two to four per README.
-- **Mermaid:** a fenced block labelled `mermaid`. Put file paths and real names in node labels, wrap labels in quotes, and keep a diagram to about ten nodes. Parse errors show up in the preview.
+- **Mermaid:** a fenced block labelled `mermaid`. Put file paths and real names in node labels and wrap labels in quotes. Write the label at the node's first use (`a["Alpha"] --> b`). The preview's Mermaid also accepts a label added later, but an id with no label shows as plain text. Do not use these words as ids, because they fail to parse (tried with Mermaid 11.4.1): `end`, `graph`, `subgraph`, `style`, `class`, `classDef`, `call` and `href` in a flowchart, and `default` in a state diagram. Another word works (`stop`, or `End` with a capital). About ten nodes is a guide, not a limit: draw the path the code takes and split the diagram when it stops fitting a screen. When the documented thing is an instruction file, such as a skill, the nodes are the steps the file orders, each naming the file that holds it. Parse errors show up in the preview.
 - **Anchors:** heading text, lower case, punctuation dropped, spaces to hyphens. "Use it when, and when not to" becomes `#use-it-when-and-when-not-to`. A heading with code in it keeps the code's text.
-- **Jump links:** one row under the hero, only to sections that exist, in page order.
-- **Tree lines:** keep every line under about 100 characters.
+- **Jump links:** one row under the hero, only to sections that exist, in page order. Past about 300 lines also add a contents list. A collapsed one in `<details>` counts. Under that length the jump row is enough.
+- **Code and tree lines:** keep every line under about 95 characters. The column holds about 97, and a longer line scrolls sideways. Split a long shell line with a trailing backslash. The preview names any line that is too wide.
+
+## Sizing, and sections with nothing to say
+
+- Size the README to the project. A small app needs a hero, a demo, a paragraph, a quick start, a short how it works, the layout and the license. A README of one-line sections looks like padding.
+- Delete a section that has nothing true to put in it. Keep a negative statement only when a reader would look for the thing and be misled by silence, for example "There are no tests in this folder." Write it as one plain sentence in the section where the reader would look.
+- Instructions for retaking the images go in the collapsed block at the end of Development. Delete it when the images were not made from a kept capture config.
+
+## A project inside a larger repository
+
+For a README in a sub-folder, such as an example or a package in a monorepo.
+
+- The tree root is the project's own folder, written as its path from the repository root (`examples/app/`). The tree lists only that folder.
+- Links to shared files count from the README's folder: `[LICENSE](../../LICENSE)`. If the folder has no license of its own, say that the repository's license covers it.
+- Commands run from the project's folder. Start the quick start with `cd examples/app   # from the repository root`. Do not invent a clone URL: you may not know it, and the reader is already in the repository.
+- Write paths to tools elsewhere in the repository relative to the project's folder (`../../tools/x`).
+
+## A project with no screen
+
+For a skill, plugin, CLI, library or other project with no UI of its own.
+
+- Keep the hero. Under it, instead of the demo GIF, show real output of the project's own tools on a bundled example: text in a code block, or an image that the tool itself saved. Caption it exactly: "Output of `tool check example/`, unedited." Never write the output by hand or mock it up. If the tool cannot run safely and offline, leave the block out.
+- When the first success happens inside an agent session, say where each step is typed. Use this shape:
+
+````markdown
+## Quick start
+
+You need {{an agent that can load skills, and any other prerequisite}}.
+
+In a terminal:
+
+```sh
+{{install command}}   # {{what it does, and where it puts files}}
+```
+
+In an agent session, say:
+
+```text
+{{the exact words to type}}
+```
+
+{{ONE PARAGRAPH: what the agent does next, in order, and what the reader sees at the end.}}
+````
+
+- For how it works, the diagram's nodes are the steps the instruction file orders, each naming the file that holds the step. Section E of `readme-patterns.md` covers the install matrix and the table of what a skill or plugin sends where.

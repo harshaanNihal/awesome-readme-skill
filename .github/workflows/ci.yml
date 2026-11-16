@@ -135,7 +135,8 @@ jobs:
           [ -n "$gif" ] || { echo "capture.json defines no gif" >&2; exit 1; }
           node "$GITHUB_WORKSPACE/skills/awesome-readme/scripts/verify-gif.mjs" "$RUNNER_TEMP/images/$gif"
 
-      # Each README is rendered with the repository folder it documents as the root. A README that is not written yet is skipped.
+      # Each README is rendered with the repository root as <repo-root>, whatever folder the README is in. A README that is not
+      # written yet is skipped.
       - name: Render the READMEs offline
         shell: bash
         run: |
@@ -148,7 +149,7 @@ jobs:
               continue
             fi
             echo "render --offline $file"
-            bash skills/awesome-readme/scripts/preview/render.sh --offline "$file" "$(dirname "$file")" "$RUNNER_TEMP/preview-$name" || {
+            bash skills/awesome-readme/scripts/preview/render.sh --offline "$file" . "$RUNNER_TEMP/preview-$name" || {
               echo "render check failed for $file" >&2
               rc=1
             }
