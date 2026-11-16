@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Syntax-check every .mjs and .sh file
+        shell: bash
+        run: |
+          while IFS= read -r -d '' f; do
+            echo "node --check $f"
+            node --check "$f" || exit 1
+          done < <(find . \( -name .git -o -name node_modules \) -prune -o -name '*.mjs' -print0)
+          while IFS= read -r -d '' f; do
+            echo "bash -n $f"
+            bash -n "$f" || exit 1
+          done < <(find . \( -name .git -o -name node_modules \) -prune -o -name '*.sh' -print0)
+
+      - name: Parse every .json file
+        shell: bash
+        run: |
+          while IFS= read -r -d '' f; do
+            echo "parse $f"
+            node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$f" || exit 1
+          done < <(find . \( -name .git -o -name node_modules \) -prune -o -name '*.json' -print0)
+
+      - name: Check manifests, skill layout and front matter
+        run: node tools/check-repo.mjs
+
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: false
+
+      # skills-ref is the reference validator of the open Agent Skills standard. It is pinned to a
+      # commit so an upstream change cannot break this build unannounced; to update the pin, run
+      #   gh api repos/agentskills/agentskills/commits/HEAD --jq .sha
+      # and check that this step still passes.
+      - name: Validate the skill with skills-ref
+        run: >-
+          uvx --from
+          'git+https://github.com/agentskills/agentskills@83021e2be457a9b6679148719c1f6074f0ad975e#subdirectory=skills-ref'
+          skills-ref validate skills/awesome-readme
+
+  # A later change adds the smoke-test job here, below "check".
