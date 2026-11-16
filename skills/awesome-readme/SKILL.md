@@ -19,7 +19,7 @@ The input is the repository path and any flags the user gave, either in the invo
 - `--update`: refresh a README after the code changed. See "Mode: update".
 - `--offline`: use no network in stages 4 and 5: render the preview locally and skip the URL fetches. See stage 4 and "What leaves the machine".
 
-`--check` and `--update` do not combine. If the user asks for both, run `--check` and offer the update at the end. `--offline` and `--no-images` go with any mode. A request in words counts as a flag: "is my README still accurate?" is `--check`, and "the code changed, bring the README up to date" is `--update`.
+`--check` and `--update` do not combine. If the user asks for both, run `--check` and offer the update at the end. `--offline` and `--no-images` go with any mode. A request in words counts as a flag: "is my README still accurate?" is `--check`, and "the code changed, bring the README up to date" is `--update`. Words about keeping things local, such as "nothing may leave my machine" or "no network", mean `--offline`. Then stage 4 renders locally, stage 5 skips every URL fetch (link and badge GETs too, although they carry no README text) and lists those URLs as unchecked, and the research is not refreshed.
 
 Below, `<skill>` is the absolute path of the folder that holds this file. Substitute it before running anything, because commands run from other folders and a relative path would not find the scripts.
 
@@ -27,7 +27,7 @@ Below, `<skill>` is the absolute path of the folder that holds this file. Substi
 
 1. Read the current README, the manifest (package file, build file), the scripts or task runner, `CONTRIBUTING`, and any repo instructions file. Note the project's voice and any branch rules (for example PR-only).
 2. Find out whether an **offline demo instance** exists: a fixture or demo server, a script that runs on sample data, a seeded container, a storybook, a test harness that serves the UI. No demo instance, or a project with no screen (a CLI, a library, an agent skill): skip stage 2, say so in your report, and show real output of the project's own tools on a bundled example, captioned as that. See "A project with no screen" in `references/readme-skeleton.md`. Never mock up a screenshot or an output.
-3. Check whether sub-agents are available. If yes, run one per stage (table below). If no, run the stages yourself, in order. Stage 5 must still be a separate pass: reopen the files and check each sentence fresh, as if someone else wrote the draft.
+3. Check whether sub-agents are available. If yes, run one per stage (table below). If no, run the stages yourself, in order. Stage 5 must still be a separate pass: reopen the files, build the statement list by reading the stage 4 preview of the README top to bottom (not from your own diff or notes), and check each sentence fresh, as if someone else wrote the draft.
 4. Make a scratch folder outside the repo (use your session's scratch folder if you have one, or a new temporary folder such as `mktemp -d` gives) for downloads, helper packages and preview output. Nothing from it goes into the repo except the final images.
 5. Write for the repo as it will be at merge time. If code is being restructured in parallel, get the target layout from whoever owns that work, write against it, and re-verify every path once the restructure lands.
 
@@ -47,15 +47,15 @@ Choose a full run over `--update` when the changes touch most sections, or when 
 
 Use it when the user has a README and wants to know what in it is wrong, or whether it can be trusted. The user may not want anything to move yet, so this mode changes nothing: no edit, no commit, no branch, no pull request. Do not fix even a typo. The value is a complete list the user can read before deciding.
 
-1. Do steps 1, 3 and 4 of "Before you start".
-2. Run stage 5 on the README as it stands, with `references/fact-check-checklist.md`, in the same fixed areas. Do not edit the README. Where the checklist says to fix, write the corrected wording in the report instead. Mark each claim confirmed, wrong or could not confirm.
+1. Do steps 1, 3 and 4 of "Before you start". There is no draft in this mode: list the README's claims first, then open the code for each claim.
+2. Run stage 5 on the README as it stands, with `references/fact-check-checklist.md`, in the same fixed areas. Do not edit the README. Where the checklist says to fix, write the corrected wording in the report instead. Mark each claim confirmed, wrong or could not confirm. Confirmed claims are counted in the totals, not listed. A retake of images (area 12) always uses `--out <scratch folder>`, so committed images are never overwritten. Area 12 says what to do when the config's port is busy.
 3. Run stage 4 on the README as it stands, with output in the scratch folder. Open every PNG and list every layout problem. Fix none of them.
 4. Keep the network rule (Hard rules) and never use real personal data.
 5. Return a report with these parts:
    - Wrong statements: the README line, what it says, the file and line that disproves it, and the corrected wording.
    - Statements you could not confirm, each with what you tried.
-   - Layout problems from stage 4, which render mode you used, and the run's "NOT checked" line about remote images.
-   - Totals: checked, wrong, unconfirmed. A statement is one checkable clause.
+   - Layout problems from stage 4, which render mode you used, and the run's "NOT checked" line about remote images. For an `--offline` run also say that the default check was not run and that syntax colours, emoji and remote images were not seen.
+   - Totals: checked, wrong, unconfirmed, counted by the rule in step 1 of "How to check" in the checklist. Of the confirmed claims, say how many you confirmed by running something and how many by reading only.
    - Code problems you noticed, listed separately. They are not README errors.
 6. End by offering to apply the corrections. If the user accepts, that is a normal run from stage 5 on: apply them, run stage 4 again, then stage 6.
 
@@ -64,10 +64,10 @@ Use it when the user has a README and wants to know what in it is wrong, or whet
 Use it when the README was right once and the code has moved on: new or renamed commands, changed defaults, a new feature, a changed screen. The aim is a small diff the owner can review. A rewrite would bring unchecked claims back in. Do "Before you start" first. Step 2 there matters for the images.
 
 1. Find what changed since the README was last touched. `git log -1 --format=%H -- <README>` prints the commit that last changed it. Then `git diff --stat <that commit>..HEAD` lists the files changed since. Read the diffs of the files that matter, and look at `git status --short` for uncommitted work. Empty output or no git history: compare the README's statements with the code, as `--check` does. A recent typo fix can hide older drift, so treat the diff as a lead and not as proof.
-2. Map the changes to README sections and write the map down before editing: commands and options, configuration and keys, features, the layout tree, counts, diagrams, and images whose screen changed.
-3. Edit only the mapped sections. Keep the structure, the voice and everything that is still true. Do not rewrite, reorder or restyle.
-4. Retake only the images whose screen changed, with the capture config the repository keeps (search for a JSON file with a `shots` list). Pass the shot names to `capture.mjs` without `.png` (`gif` is the GIF). Follow stage 2 for the setup, the rules and opening every image. Keep the file names, so the README links still work. No config and no demo instance, or `--no-images`: leave the images alone. Either way, tell the user which images were not retaken and whether the changes probably made them stale.
-5. Run stage 4. Run stage 5 over the whole README, not only the edited sections: old claims rot too, and an edit can break a number or an anchor elsewhere. Then run stage 6 as in a full run. In the pull request, say which commit the update started from.
+2. Map the changes to README sections and write the map down before editing: commands and options, configuration and keys, features, the layout tree, counts, diagrams, and images whose screen changed. Then search the repository for the old values (the old port, old file names, old counts). List the other files that still carry them in your report and edit none of them without asking.
+3. Edit only the mapped sections. Keep the structure, the voice and everything that is still true. Do not rewrite, reorder or restyle. Leave alt texts, captions and numbers that describe an image until step 4, and edit them after you have opened the retaken image.
+4. Retake only the images whose screen changed, with the capture config the repository keeps (search for a JSON file with a `shots` list). Pass the shot names to `capture.mjs` without `.png` (`gif` is the GIF). Follow stage 2 for the setup, the rules and opening every image. Keep the file names, so the README links still work. If a shot no longer fits (new data cuts a card off, say), you may change the kept config in the same pull request (a taller `viewport`, an `element`, `fullPage`) and say so in it. If the owner said not to touch config, retake with a one-off command-line override such as `--height N` and note that in the pull request. `--height` applies to every shot named in that run, and a height that a shot or the GIF sets in its own `viewport` wins over it. No config and no demo instance, or `--no-images`: leave the images alone. Either way, tell the user which images were not retaken and whether the changes probably made them stale.
+5. Run stage 4. Run stage 5 over the whole README, not only the edited sections: old claims rot too, and an edit can break a number or an anchor elsewhere. Then run stage 6 as in a full run. In the pull request, say which commit the update started from. `--update` has no writer's "Claims I could not confirm" list: give the stage 5 agent the list of lines you edited instead.
 
 ## Stages and models
 
@@ -93,7 +93,7 @@ Use this to answer what a run sends and where. Each row was checked against the 
 
 | Stage | What leaves the machine | To where | How to avoid it |
 |---|---|---|---|
-| 1 | Nothing. A refresh of the research (only if asked) downloads public READMEs | raw.githubusercontent.com | Use `references/readme-patterns.md` as it is |
+| 1 | Nothing. A refresh of the research (when asked, or when the project is a different kind of thing from the sample) downloads public READMEs | raw.githubusercontent.com | Use `references/readme-patterns.md` as it is |
 | 2 | Nothing from the project. The helper packages are downloaded when you install them. Only if the run allows remote origins (`--allow-remote` or `allowOrigins`): Chrome's own startup requests, which carry nothing from the project | npm registry; browser vendor hosts (Google's, for Chrome) in that case only | `--no-images`, or keep the capture run loopback-only: then Chrome starts with a host resolver rule that fails every host name except loopback, so nothing but the demo instance is reached, Chrome's own requests included. The tool also aborts and lists page requests to other origins |
 | 3 | Nothing | none | not needed |
 | 4, default | The whole README text. Two downloads that carry no README text: the stylesheet and the Mermaid script. Chrome's own startup requests, which carry nothing from the README | GitHub's Markdown API through `gh`; cdnjs.cloudflare.com; cdn.jsdelivr.net; browser vendor hosts (Google's, for Chrome) | `--offline` |
@@ -120,6 +120,7 @@ A project with no screen has no demo instance. Replace this stage by running the
    - **GIF state.** Recording begins right after the page loads, and the steps run while it records. Anything a step sets, such as a filter or a select, shows as the old state in the first frames. Set it before recording starts: use `colorScheme`, and put what the app reads from the address in the URL `path`. To hold the opening frame, make the first step `{"wait": 1000}`.
    - **Selects.** A `select` step chooses an option of a `<select>` by its value.
    - **Names.** On the command line give a shot's name without `.png`. In the config either spelling works.
+   - **Another port.** If the config's port is busy, copy the config to the scratch folder and change the port in `baseUrl` and `server.args` there (run from the same folder, with an absolute `--config`), or pass `--base-url <url> --server "<command> <args>"` for one run. The two go together when the command takes the port.
 5. **Open every image** with an image-reading tool and reject blank, half-loaded, spinner, error, cut-off and stray-hover states. A focus ring or caret that the app itself draws is not a stray state; a hover left by the pointer is. If you cannot view images, skip stage 2 and say so in your report. Check the GIF: `node <skill>/scripts/verify-gif.mjs <gif> --frames <new empty folder>` prints size, frame count and play time, and writes one PNG per frame. Open a few frames, the first and the last among them.
 6. Every name, address and account shown must be fictional (`example.com`, invented names).
 7. Output: the file list with sizes, what each image shows, and an alt text for each: one or two sentences that name the screen, the state shown and the numbers visible, without "screenshot of". Images go in `docs/images/` unless the repo has a convention. Say that the capture config could stay in the repo so a later `--update` can retake images, and add it only if the user agrees.
@@ -167,7 +168,7 @@ The first line is the default mode, the closest preview of GitHub. The second is
 
 **Which one.** Sending the draft to GitHub's Markdown API needs the owner's agreement, so the orchestrator says whether it has it. Use `--offline` when the user asked for it, when the project is not on GitHub, when `gh` is missing or not logged in, or when the README must not leave the machine before the user decides to publish it. Otherwise use the default. If you used `--offline`, say in your report that the default check was not run, and that syntax colours, emoji and remote images were not seen.
 
-Open every PNG in `<out>/shots/`, in both themes. Per theme it holds `first` (the first screen), `slice-NN` (the whole page in 900 px slices), `mermaid-N` (each diagram) and `details-N` (each `<details>`, opened). `report.json` holds the checks. A GIF shows as one arbitrary still frame there: judge the GIF in stage 2. Fix **layout only**, never facts. Typical fixes: a Mermaid label that needs quotes, a code or tree line wider than the column (the run prints the width and each offending line: shorten it, or split a shell line with a trailing backslash), a `style` attribute (GitHub strips it; `align`, `width` and `height` survive), a tall image that needs `<details>`, an anchor that does not match its heading. Hard-wrapped lines are not a problem, because they flow; wide code lines are. Repeat until clean. Badges and other remote images show as local placeholders, so stage 5 checks their real URLs.
+Open every PNG in `<out>/shots/`, in both themes. Per theme it holds `first` (the first screen), `slice-NN` (the whole page in 900 px slices, and a nearly empty last slice is normal), `mermaid-N` (each diagram) and `details-N` (each `<details>`, opened). `first` and `slice-01` show the same screen and are the same image unless a GIF on it shows a different frame, so open one of the pair. `report.json` holds the checks. A GIF shows as one arbitrary still frame there: judge the GIF in stage 2. Fix **layout only**, never facts. Typical fixes: a Mermaid label that needs quotes, a code or tree line wider than the column (the run prints the width and each offending line: shorten it, or split a shell line with a trailing backslash), a `style` attribute (GitHub strips it; `align`, `width` and `height` survive), a tall image that needs `<details>`, an anchor that does not match its heading. Hard-wrapped lines are not a problem, because they flow; wide code lines are. Repeat until clean. Badges and other remote images show as local placeholders, so stage 5 checks their real URLs.
 
 ## 5. Fact-check
 
@@ -187,9 +188,9 @@ Expect many corrections. Earlier runs needed many corrections in drafts the writ
 ## Hard rules
 
 - `--check` changes nothing in the repo: no edit, commit, branch or pull request.
-- **Network.** Allowed: a plain GET or HEAD, without credentials, of a URL the README itself links or embeds (a documentation link, a badge image), because a reader's browser fetches it anyway. Forbidden: calling a service the project integrates with in order to show or verify a feature, and sending project data anywhere that "What leaves the machine" does not list. Screenshots come from the demo instance only. A `--offline` run makes none of the allowed requests: it skips them and lists those URLs as unchecked.
+- **Network.** Allowed: a plain GET or HEAD, without credentials, of a URL the README itself links or embeds (a documentation link, a badge image), because a reader's browser fetches it anyway. A URL that appears only inside a code block is not fetched. Forbidden: calling a service the project integrates with in order to show or verify a feature, and sending project data anywhere that "What leaves the machine" does not list. Screenshots come from the demo instance only. A `--offline` run makes none of the allowed requests: it skips them and lists those URLs as unchecked.
 - Never put real personal data in an image or in the README.
-- Helper npm packages live in the scratch folder, never in the repo. Do not change code, config or tests in the repo.
+- Helper npm packages live in the scratch folder, never in the repo. Do not change code, config or tests in the repo. The one exception is the kept capture config in `--update` (see step 4 of that mode).
 - A GIF stays under 4 MB. Roughly: a 9 second, 1200 px wide GIF from `gifenc` came out near 700 KB.
 - The Mermaid build on cdnjs was blocked by the browser (ORB) in the local preview. The preview scripts use the jsdelivr build.
 - Callouts (`> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`) render. Use two to four.
@@ -208,6 +209,6 @@ Expect many corrections. Earlier runs needed many corrections in drafts the writ
 
 ## Final report to the user
 
-Full run and `--update`: list the README path, the images produced or retaken (or why none, and which were not retaken), the stage 4 result and the render mode used with the run's "NOT checked" line about remote images, the stage 5 totals (checked, corrected, removed, confirmed), the URLs fetched or, with `--offline`, left unchecked, code problems found, claims still unconfirmed, and the PR link with a note that it is waiting for approval. `--update` also lists the sections you changed and the commit the update started from.
+Full run and `--update`: list the README path, the images produced or retaken (or why none, and which were not retaken), the stage 4 result and the render mode used with the run's "NOT checked" line about remote images, the stage 5 totals (checked, corrected, removed, confirmed, and of the confirmed how many by running and how many by reading only), the URLs fetched or, with `--offline`, left unchecked, code problems found, claims still unconfirmed, and the PR link with a note that it is waiting for approval. `--update` also lists the sections you changed and the commit the update started from, and reports the lines you corrected in the edit step apart from the corrections the stage 5 pass found.
 
 `--check`: the report from "Mode: check only", and the offer to apply the corrections.

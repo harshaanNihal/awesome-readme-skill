@@ -32,9 +32,10 @@
 #   mode swaps them for placeholders too, and both modes print how many. Everything else is still checked.
 #   --offline is an APPROXIMATION of GitHub's renderer. Paragraphs flow as in "markdown" mode. It can differ from github.com in:
 #   syntax highlighting (none), emoji shortcodes, @mentions and #issue links, footnotes, math, relative-link rewriting, heading
-#   ids and permalinks, autolink and HTML-nesting edge cases, and the HTML sanitizer (it drops <script>, <style> and the like,
-#   style="..." and on*= attributes, and nothing more). The default mode stays the accurate one: run it before you deliver
-#   when you can.
+#   ids and permalinks, autolink and HTML-nesting edge cases, and the HTML sanitizer (it removes <script>, <style>, <iframe>,
+#   <object>, <embed> and <form> elements that have a closing tag, with what is inside them, the <link>, <meta> and <base> tags,
+#   and style="..." and on*= attributes, and nothing more; an opening tag with no closing tag is left alone). The default mode
+#   stays the accurate one: run it before you deliver when you can.
 set -euo pipefail
 : "${README_TOOLS:?set README_TOOLS to the scratch folder that holds node_modules}"
 export README_TOOLS

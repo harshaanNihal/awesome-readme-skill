@@ -135,7 +135,7 @@ If one returns 404, skip it and say so. Save the files in a scratch folder, neve
 
 A skill or plugin has no screen of its own, several install routes, and an effect that happens inside someone else's agent session. Three blocks cover what the sample READMEs do not. Install sections for skills can be seen in the READMEs of `anthropics/skills`, `vercel-labs/agent-skills` and `obra/superpowers`. The hero, quick start and layout follow `readme-skeleton.md`, including its "A project with no screen" notes.
 
-**1. Install matrix.** One row per route. Show the default route's command in the quick start, then the matrix, collapsed in `<details>` when it has more than about four rows. The Tested column is honest: write "yes" only for a route you ran and logged (the command, the date or version, and the result), and keep the log where the fact-checker can open it. A route you only read about says "documented, not run". Run the routes you can, in a throwaway location, before the draft, and hand the logs to the writer.
+**1. Install matrix.** One row per route. Show the default route's command in the quick start, then the matrix, collapsed in `<details>` when it has more than about four rows. The Tested column is honest: write "yes" only for a route you ran and logged (the command, the date or version, and the result), and keep the log where the fact-checker can open it. If the table records tests of an earlier commit, name that commit and the date, and say that the table is not a check of the version the reader has. A route you only read about says "documented, not run". Run the routes you can, in a throwaway location, before the draft, and hand the logs to the writer.
 
 ````md
 | Route | Command | Tested |
