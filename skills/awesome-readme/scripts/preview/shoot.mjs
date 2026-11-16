@@ -1,11 +1,21 @@
 // Opens the preview page in dark and light, checks it, and saves screenshots.
 // Usage: README_TOOLS=<scratch folder> node shoot.mjs [--offline] <readme-preview.html> <out-dir>
-// --offline: Chrome gets no network at all. Only file:, data: and about: requests run. Any other request is aborted, recorded
-// and fails the run with the full list (the CDN allowance of the default mode is off). The render is an approximation of
-// GitHub's (see offline.mjs); the default mode is the accurate one.
-// Saves per theme: first screen, 900 px slices of the whole page, each Mermaid diagram, each <details> opened.
-// Checks (printed, and written to report.json): Mermaid parse errors, broken images, tall images outside <details>,
-// links to #anchors that match no heading, code blocks and tables wider than the column, horizontal page scroll.
+// Network, both modes: Chrome starts with --disable-background-networking and --disable-component-update. They do not stop
+//   everything: Chrome 157 still made four startup requests of its own, to Google hosts (a clock check, an account list and
+//   two others), the same with no README open. The page interception below cannot see them, and they carry nothing from the
+//   README.
+//   Default mode: the page may load only from cdnjs.cloudflare.com (the stylesheet) and cdn.jsdelivr.net (Mermaid). Those two
+//   requests carry no README text. Every other request the page makes is aborted, recorded and fails the run.
+//   --offline: Chrome gets no network at all. Only file:, data: and about: requests run. Any other request is aborted, recorded
+//   and fails the run with the full list (the CDN allowance is off). The render is an approximation of GitHub's (see
+//   offline.mjs); the default mode is the accurate one.
+// Saves per theme (dark and light) in <out-dir>: <theme>-first.png (the first screen), <theme>-slice-NN.png (the whole page
+// in 900 px slices), <theme>-mermaid-N.png (each diagram) and <theme>-details-N.png (each <details> opened), plus report.json.
+// Open every PNG. A GIF shows as one arbitrary still frame here: judge a GIF when it is made (stage 2).
+// Checks (printed, and written to report.json): Mermaid parse errors, broken images, tall images (rendered more than 900 px
+// high at the width shown) outside <details>, links to #anchors that match no heading, code blocks and tables wider than the
+// column, horizontal page scroll.
+// Prints how many remote images (badges, hosted pictures) were swapped for local placeholders: those are NOT checked.
 // Exit code 1 when any check fails. Look at the screenshots too: the checks cannot see ugly.
 import fs from 'node:fs'
 import path from 'node:path'
@@ -18,21 +28,27 @@ const [html, outDir] = process.argv.slice(2).filter((a) => a !== '--offline')
 if (!outDir) { console.error('usage: node shoot.mjs [--offline] <readme-preview.html> <out-dir>'); process.exit(2) }
 fs.mkdirSync(outDir, { recursive: true })
 const cdn = /^https:\/\/(cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net)\//
-// Offline also makes every host name fail to resolve and stops Chrome's own background requests, as a second wall behind the interception.
-const args = ['--allow-file-access-from-files', ...(offline ? ['--host-resolver-rules=MAP * ~NOTFOUND', '--disable-background-networking'] : [])]
+// Both modes switch off Chrome's own background requests. puppeteer-core 25.17.0 adds --disable-background-networking itself;
+// it is passed here too so the run does not depend on the puppeteer version. --disable-component-update stops the component
+// downloads that the first flag left running in Chrome 157. The host rule below stays offline-only: the default mode has to
+// reach two CDN hosts.
+// Offline also makes every host name fail to resolve, so Chrome's own startup requests cannot leave either (Chrome 157 still
+// starts them, and they fail at name resolution), as a second wall behind the interception.
+const args = ['--allow-file-access-from-files', '--disable-background-networking', '--disable-component-update', ...(offline ? ['--host-resolver-rules=MAP * ~NOTFOUND'] : [])]
 const browser = await puppeteer.launch({ executablePath: chromePath(), headless: true, args })
 const report = {}
 const problems = []
 
 for (const theme of ['dark', 'light']) {
-  const r = (report[theme] = { console: [], blocked: [], pageErrors: [], ...(offline && { requests: {} }) })
+  const r = (report[theme] = { console: [], blocked: [], pageErrors: [], requests: {} })
   const page = await browser.newPage()
   await page.setViewport({ width: 1280, height: 900 })
   await page.setRequestInterception(true)
   page.on('request', (req) => {
     const u = req.url()
     const scheme = u.split(':')[0]
-    if (offline) r.requests[scheme] = (r.requests[scheme] ?? 0) + 1 // request log: count per scheme
+    const key = /^https?$/.test(scheme) ? new URL(u).origin : scheme // request log: count per origin (http, https) or per scheme
+    r.requests[key] = (r.requests[key] ?? 0) + 1
     if (/^(file|data|about):/.test(u) || (!offline && cdn.test(u))) req.continue()
     else { r.blocked.push(u); req.abort() }
   })
@@ -70,7 +86,7 @@ for (const theme of ['dark', 'light']) {
     }
     return [...document.querySelectorAll('article a[href^="#"]')].map((a) => a.getAttribute('href').slice(1)).filter((id) => id && !ids.has(decodeURIComponent(id).toLowerCase()) && !ids.has(id))
   })
-  if (offline) r.placeholders = await page.evaluate(() => document.querySelectorAll('img[data-badge]').length)
+  r.placeholders = await page.evaluate(() => document.querySelectorAll('img[data-badge]').length)
   r.overflow = await page.evaluate(() => ({
     pre: [...document.querySelectorAll('pre:not(.mermaid)')].filter((p) => p.scrollWidth > p.clientWidth).map((p) => ({ scrollW: p.scrollWidth, clientW: p.clientWidth, start: p.textContent.slice(0, 40) })),
     tables: [...document.querySelectorAll('table')].filter((t) => t.scrollWidth > t.clientWidth).map((t) => ({ scrollW: t.scrollWidth, clientW: t.clientWidth, head: t.querySelector('th')?.textContent })),
@@ -112,10 +128,9 @@ report.problems = problems
 fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(report, null, 1))
 const d = report.dark
 console.log(`dark: ${d.slices} slices, ${d.mermaid.length} diagram(s), ${d.images.length} image(s), ${d.details} <details>; light: ${report.light.slices} slices`)
-if (offline) {
-  console.log(`offline: ${d.placeholders} remote image(s) replaced by local placeholders and NOT checked; requests by scheme: ${JSON.stringify(d.requests)}; ${d.blocked.length + report.light.blocked.length} network request(s) attempted`)
-  console.log('offline render is an approximation of GitHub. Run without --offline for the accurate check when you can.')
-}
+const blockedAll = d.blocked.length + report.light.blocked.length
+console.log(`${offline ? 'offline' : 'default'}: ${d.placeholders} remote image(s) (badges, hosted pictures) replaced by local placeholders and NOT checked; requests by ${offline ? 'scheme' : 'origin'}: ${JSON.stringify(d.requests)}; ${blockedAll} request(s) blocked`)
+if (offline) console.log('offline render is an approximation of GitHub. Run without --offline for the accurate check when you can.')
 console.log(problems.length ? 'PROBLEMS:\n  ' + problems.join('\n  ') : 'No problems found by the automated checks. Now look at the screenshots.')
 console.log('screenshots and report.json in', outDir)
 process.exit(problems.length ? 1 : 0)
